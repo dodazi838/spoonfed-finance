@@ -27,7 +27,8 @@ export async function POST(req: NextRequest) {
       ],
       generationConfig: { 
         maxOutputTokens: 8192,
-        temperature: 0.1
+        temperature: 0.1,
+        responseMimeType: 'application/json'
       }
     });
 
@@ -47,9 +48,8 @@ export async function POST(req: NextRequest) {
       
       [데이터 추출 정확도 강제 규칙 - 환각(Hallucination) 및 밀림 완벽 차단]
       **1. [수치 추정 절대 금지]**: 절대 PDF 내의 이미지(그래프, 차트)를 눈으로 보고 수치를 어림짐작(~표시 등)하여 기입하지 마세요. 금융 데이터는 정확성이 생명이므로, 반드시 본문 텍스트나 표(Table)에 '명시적으로 적혀 있는 정확한 수치'만을 사용해야 합니다. 만약 정확한 수치 데이터가 없다면 해당 차트 생성을 아예 건너뛰세요.
-      **2. [핵심 CoT]**: 차트의 'data' 배열을 작성하기 **직전에 반드시** 'validation_thought' 필드를 작성하세요. 'validation_thought' 필드 안에 해당 차트에 필요한 원본 표의 '최상단 2~3개 행(Row)'만 미니 마크다운(Mini Markdown) 표로 작게 그려보세요. (전체 표 작성 금지) 그 후, 빈칸이나 결측치를 건너뛰지 않고 0으로 채워 넣으며 'data' 배열과 매칭되는지 스스로 검증하세요.
-      **3. [다중 시리즈]**: 여러 항목을 비교할 경우 'dataKeys' 배열(예: ["주담대", "기타대출"])을 사용하고, 'data' 배열에 각 항목 수치를 묶어서 작성하세요.
-      **4. [밀림 방지 룰]**: 표의 빈칸, 음수(-), 결측치는 절대 건너뛰지 말고 0 또는 원본 수치 그대로 기입하여 데이터가 밀리는 현상을 원천 차단하세요.
+      **2. [다중 시리즈]**: 여러 항목을 비교할 경우 'dataKeys' 배열(예: ["주담대", "기타대출"])을 사용하고, 'data' 배열에 각 항목 수치를 묶어서 작성하세요.
+      **3. [밀림 방지 룰]**: 표의 빈칸, 음수(-), 결측치는 절대 건너뛰지 말고 0 또는 원본 수치 그대로 기입하여 데이터가 밀리는 현상을 원천 차단하세요.
       
       [차트 타입(type) 결정 규칙]
       - 시계열 데이터: 'line' 또는 'area'
@@ -66,7 +66,6 @@ export async function POST(req: NextRequest) {
         "charts": [
           {
             "title": "차트 제목",
-            "validation_thought": "PDF 3페이지 표 참조. 미니 마크다운 검증...",
             "type": "line",
             "unit": "조원",
             "description": "차트가 보여주는 핵심 의미를 1문장으로 요약하세요.",
@@ -81,7 +80,7 @@ export async function POST(req: NextRequest) {
       \`\`\`
     `;
 
-    const resultStream = await model.generateContentStream([
+    const result = await model.generateContent([
       prompt,
       {
         fileData: {
@@ -91,10 +90,7 @@ export async function POST(req: NextRequest) {
       }
     ]);
 
-    let responseText = '';
-    for await (const chunk of resultStream.stream) {
-      responseText += chunk.text();
-    }
+    const responseText = result.response.text();
     
     const jsonMatch = responseText.match(/```json\s*([\s\S]*?)\s*```/);
     let jsonStr = '';

@@ -56,7 +56,8 @@ export async function POST(req: NextRequest) {
       ],
       generationConfig: { 
         maxOutputTokens: 8192,
-        temperature: 0.1
+        temperature: 0.1,
+        responseMimeType: 'application/json'
       }
     });
 
@@ -86,7 +87,7 @@ export async function POST(req: NextRequest) {
       \`\`\`
     `;
 
-    const resultStream = await model.generateContentStream([
+    const result = await model.generateContent([
       prompt,
       {
         fileData: {
@@ -96,10 +97,7 @@ export async function POST(req: NextRequest) {
       }
     ]);
 
-    let responseText = '';
-    for await (const chunk of resultStream.stream) {
-      responseText += chunk.text();
-    }
+    const responseText = result.response.text();
     
     // 정규식을 사용하여 ```json 과 ``` 사이의 텍스트만 안전하게 추출
     const jsonMatch = responseText.match(/```json\s*([\s\S]*?)\s*```/);
