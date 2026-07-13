@@ -24,11 +24,18 @@ export interface ChartData {
   data: any[];
 }
 
+export interface TokenUsage {
+  promptTokenCount: number;
+  candidatesTokenCount: number;
+  totalTokenCount: number;
+}
+
 export interface SectionAnalysis {
   title: string;
   easyExplanation?: string;
   charts?: ChartData[];
   isLoading?: boolean;
+  usage?: TokenUsage;
 }
 
 export interface ReportData {
@@ -38,10 +45,27 @@ export interface ReportData {
   lifeImpact: string;
   fileUri?: string;
   mimeType?: string;
+  usage?: TokenUsage; // Usage from the initial analyze request
 }
 
 export default function ReportResult({ data }: { data: ReportData }) {
   const [copied, setCopied] = useState(false);
+
+  // Aggregate total tokens used in this session
+  const getTotalTokens = () => {
+    let total = 0;
+    if (data.usage?.totalTokenCount) {
+      total += data.usage.totalTokenCount;
+    }
+    data.sections.forEach(section => {
+      if (section.usage?.totalTokenCount) {
+        total += section.usage.totalTokenCount;
+      }
+    });
+    return total;
+  };
+
+  const totalTokens = getTotalTokens();
 
   const handleCopyBlog = () => {
     const markdown = `
@@ -103,9 +127,7 @@ ${data.lifeImpact}
             {keys.map((key, idx) => {
               const color = COLORS[idx % COLORS.length];
               return (
-                <Line key={key} type="monotone" dataKey={key} name={key === 'value' ? '수치' : key} stroke={color} strokeWidth={3} dot={{ r: 4, fill: color, strokeWidth: 2 }} activeDot={{ r: 6 }}>
-                  <LabelList dataKey={key} position="top" fill="#1e293b" fontSize={13} fontWeight="bold" offset={10} />
-                </Line>
+                <Line key={key} type="monotone" dataKey={key} name={key === 'value' ? '수치' : key} stroke={color} strokeWidth={3} dot={{ r: 4, fill: color, strokeWidth: 2 }} activeDot={{ r: 6 }} />
               );
             })}
           </LineChart>
@@ -151,9 +173,7 @@ ${data.lifeImpact}
             {keys.map((key, idx) => {
               const color = COLORS[idx % COLORS.length];
               return (
-                <Area key={key} type="monotone" dataKey={key} name={key === 'value' ? '수치' : key} stroke={color} fillOpacity={0.15} fill={color}>
-                   <LabelList dataKey={key} position="top" fill="#1e293b" fontSize={13} fontWeight="bold" offset={10} />
-                </Area>
+                <Area key={key} type="monotone" dataKey={key} name={key === 'value' ? '수치' : key} stroke={color} fillOpacity={0.15} fill={color} />
               );
             })}
           </AreaChart>
@@ -174,9 +194,7 @@ ${data.lifeImpact}
             {keys.map((key, idx) => {
               const color = COLORS[idx % COLORS.length];
               return (
-                <Bar key={key} dataKey={key} name={key === 'value' ? '수치' : key} fill={color} radius={[4, 4, 0, 0]} barSize={keys.length > 1 ? 25 : 45}>
-                  <LabelList dataKey={key} position="top" fill="#1e293b" fontSize={13} fontWeight="bold" offset={10} />
-                </Bar>
+                <Bar key={key} dataKey={key} name={key === 'value' ? '수치' : key} fill={color} radius={[4, 4, 0, 0]} barSize={keys.length > 1 ? 25 : 45} />
               );
             })}
           </BarChart>
@@ -279,6 +297,12 @@ ${data.lifeImpact}
           PDF로 깔끔하게 저장하기
         </button>
       </div>
+      
+      {totalTokens > 0 && (
+        <div style={{ textAlign: 'center', marginTop: '1rem', color: '#94a3b8', fontSize: '0.9rem' }}>
+          현재 세션 AI 토큰 사용량: <strong>{totalTokens.toLocaleString()}</strong> Tokens
+        </div>
+      )}
 
     </div>
   );

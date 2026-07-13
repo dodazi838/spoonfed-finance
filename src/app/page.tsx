@@ -1,16 +1,24 @@
 'use client';
 
 import { useState, useCallback } from 'react';
-import { UploadCloud, FileText, Loader2, AlertCircle } from 'lucide-react';
+import { UploadCloud, FileText, Loader2, AlertCircle, CheckSquare, Square } from 'lucide-react';
 import styles from './page.module.css';
 import ReportResult, { ReportData } from '@/components/ReportResult';
 
+type Step = 'upload' | 'select' | 'analyze';
+
 export default function Home() {
+  const [step, setStep] = useState<Step>('upload');
   const [isDragging, setIsDragging] = useState(false);
   const [file, setFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  
+  const [tocData, setTocData] = useState<any>(null);
+  const [selectedChapters, setSelectedChapters] = useState<string[]>([]);
   const [reportData, setReportData] = useState<ReportData | null>(null);
+  const [selectedModel, setSelectedModel] = useState<string>('gemini-2.5-flash');
+  const [sessionTokens, setSessionTokens] = useState<number>(0);
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -52,113 +60,175 @@ export default function Home() {
     setError(null);
     setIsUploading(true);
     setReportData(null);
+    setTocData(null);
+    setSelectedChapters([]);
     
     try {
-      // Phase 1: 목차 및 요약 추출
       const formData = new FormData();
       formData.append('file', selectedFile);
+      formData.append('modelName', selectedModel);
 
       const response = await fetch('/api/analyze', {
         method: 'POST',
         body: formData,
       });
 
-      const tocData = await response.json();
+      const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(tocData.error || '리포트 요약 중 오류가 발생했습니다.');
+        throw new Error(data.error || '리포트 요약 중 오류가 발생했습니다.');
       }
 
-      // Phase 1 결과로 초기 뼈대 UI 설정
-      const initialSections = (tocData.chapters || []).map((chapterTitle: string) => ({
-        title: chapterTitle,
-        isLoading: true,
-      }));
-
-      const initialData: ReportData = {
-        summary: tocData.summary || [],
-        lifeImpact: tocData.lifeImpact || '',
-        sections: initialSections,
-        fileUri: tocData.fileUri,
-        mimeType: tocData.mimeType,
-      };
-
-      setReportData(initialData);
-      setIsUploading(false); // 업로드(Phase 1) 완료 UI 해제. 이후 개별 섹션 렌더링 시작.
-
-      // Phase 2: 순차적으로 각 챕터 분석 (타임아웃 방지 및 안전한 처리)
-      for (let i = 0; i < (tocData.chapters || []).length; i++) {
-        const chapterTitle = tocData.chapters[i];
-        
-        try {
-          const chapterRes = await fetch('/api/analyze-chapter', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              fileUri: tocData.fileUri,
-              mimeType: tocData.mimeType,
-              chapterTitle: chapterTitle
-            })
-          });
-
-          const chapterData = await chapterRes.json();
-
-          if (chapterRes.ok) {
-            // 해당 챕터의 로딩 상태 해제 및 데이터 삽입
-            setReportData(prev => {
-              if (!prev) return prev;
-              const newSections = [...prev.sections];
-              newSections[i] = {
-                title: chapterData.title || chapterTitle,
-                easyExplanation: chapterData.easyExplanation,
-                charts: chapterData.charts,
-                isLoading: false,
-              };
-              return { ...prev, sections: newSections };
-            });
-          } else {
-            console.error('Chapter fetch error:', chapterData.error);
-            // 에러 시 로딩 상태 해제 및 에러 문구 표시
-            setReportData(prev => {
-              if (!prev) return prev;
-              const newSections = [...prev.sections];
-              newSections[i] = {
-                title: chapterTitle,
-                easyExplanation: '해당 챕터를 분석하는 중 오류가 발생했습니다.',
-                charts: [],
-                isLoading: false,
-              };
-              return { ...prev, sections: newSections };
-            });
-          }
-        } catch (e) {
-          console.error('Failed to fetch chapter:', e);
-        }
+      if (data.usage?.totalTokenCount) {
+        setSessionTokens(prev => prev + data.usage.totalTokenCount);
       }
 
+      setTocData(data);
+      setStep('select');
+      setIsUploading(false);
     } catch (err: any) {
       setError(err.message || '알 수 없는 오류가 발생했습니다.');
       setFile(null);
       setIsUploading(false);
+      setStep('upload');
     }
+  };
+
+  const toggleChapterSelection = (chapter: string) => {
+    setSelectedChapters(prev => {
+      if (prev.includes(chapter)) {
+        return prev.filter(c => c !== chapter);
+      }
+      const isShort = tocData?.isShortReport === true || tocData?.isShortReport === 'true';
+      const limit = isShort ? 999 : 3;
+      if (prev.length >= limit) {
+        return prev;
+      }
+      return [...prev, chapter];
+    });
+  };
+
+  const handleAnalyzeSelected = async () => {
+    if (selectedChapters.length === 0) {
+      setError('최소 1개의 챕터를 선택해주세요.');
+      return;
+    }
+
+    setStep('analyze');
+    setError(null);
+
+    const initialSections = selectedChapters.map((chapterTitle: string) => ({
+      title: chapterTitle,
+      isLoading: true,
+    }));
+
+    const initialData: ReportData = {
+      summary: tocData.summary || [],
+      lifeImpact: tocData.lifeImpact || '',
+      sections: initialSections,
+      fileUri: tocData.fileUri,
+      mimeType: tocData.mimeType,
+    };
+
+    setReportData(initialData);
+
+    for (let i = 0; i < selectedChapters.length; i++) {
+      const chapterTitle = selectedChapters[i];
+      
+      try {
+        const chapterRes = await fetch('/api/analyze-chapter', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            fileUri: tocData.fileUri,
+            mimeType: tocData.mimeType,
+            chapterTitle: chapterTitle,
+            modelName: selectedModel
+          })
+        });
+
+        const chapterData = await chapterRes.json();
+        
+        if (chapterData.usage?.totalTokenCount) {
+          setSessionTokens(prev => prev + chapterData.usage.totalTokenCount);
+        }
+
+        setReportData(prev => {
+          if (!prev) return prev;
+          const newSections = [...prev.sections];
+          if (chapterRes.ok) {
+            newSections[i] = {
+              title: chapterData.title || chapterTitle,
+              easyExplanation: chapterData.easyExplanation,
+              charts: chapterData.charts,
+              isLoading: false,
+            };
+          } else {
+            newSections[i] = {
+              title: chapterTitle,
+              easyExplanation: chapterData.error || '해당 챕터를 분석하는 중 오류가 발생했습니다.',
+              charts: [],
+              isLoading: false,
+            };
+          }
+          return { ...prev, sections: newSections };
+        });
+      } catch (e) {
+        console.error('Failed to fetch chapter:', e);
+      }
+    }
+  };
+
+  const resetAll = () => {
+    setReportData(null);
+    setFile(null);
+    setStep('upload');
+    setTocData(null);
+    setSelectedChapters([]);
+    setError(null);
   };
 
   return (
     <main className={styles.container}>
+      
+      {sessionTokens > 0 && (
+        <div style={{ position: 'fixed', top: '1rem', right: '1rem', background: 'rgba(15, 23, 42, 0.8)', backdropFilter: 'blur(10px)', border: '1px solid #334155', padding: '0.5rem 1rem', borderRadius: '99px', color: '#38bdf8', fontSize: '0.85rem', fontWeight: 600, zIndex: 100, boxShadow: '0 4px 12px rgba(0,0,0,0.2)' }}>
+          세션 토큰 소모량: {sessionTokens.toLocaleString()}
+        </div>
+      )}
+
       <section className={`${styles.hero} animate-fade-in`}>
-        <div className={styles.badge}>경제 리포트 번역기</div>
+        <div className={styles.badge}>AI 기반 경제 리포트 분석기</div>
         <h1 className={styles.title}>
-          어려운 금융경제,<br />
-          <span>대학생 눈높이</span>로 떠먹여 드립니다.
+          복잡한 금융·경제 리포트,<br />
+          <span>가장 빠르고 정확하게</span> 분석하세요.
         </h1>
         <p className={styles.description}>
-          한국은행, 금융감독원 등 공공기관의 복잡하고 긴 PDF 보고서를 업로드하세요.<br />
-          AI가 핵심 내용만 쏙쏙 뽑아 블로그 포스팅 형태로 재가공해 드립니다.
+          한국은행, 금융감독원 등 공공기관의 전문 PDF 보고서를 업로드하세요.<br />
+          핵심 챕터를 선별하여, 깊이 있는 인사이트와 직관적인 데이터 차트를 도출합니다.
         </p>
       </section>
 
-      {!reportData && (
+      {step === 'upload' && (
         <section className={`${styles.uploadSection} animate-fade-in animate-delay-2`}>
+          
+          <div style={{ display: 'flex', justifyContent: 'center', gap: '1rem', marginBottom: '1.5rem' }}>
+            <label style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', opacity: isUploading ? 0.5 : 1 }}>
+              <input type="radio" name="model" value="gemini-2.5-flash-lite" checked={selectedModel === 'gemini-2.5-flash-lite'} onChange={(e) => setSelectedModel(e.target.value)} disabled={isUploading} style={{ display: 'none' }} />
+              <div style={{ padding: '0.75rem 1.5rem', borderRadius: '12px', border: `2px solid ${selectedModel === 'gemini-2.5-flash-lite' ? '#3b82f6' : '#cbd5e1'}`, background: selectedModel === 'gemini-2.5-flash-lite' ? '#eff6ff' : 'transparent', transition: 'all 0.2s' }}>
+                <strong style={{ display: 'block', color: '#1e293b', marginBottom: '0.2rem' }}>Lite (2.5)</strong>
+                <span style={{ fontSize: '0.8rem', color: '#64748b' }}>초고속 / 100만 토큰 한도</span>
+              </div>
+            </label>
+            <label style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', opacity: isUploading ? 0.5 : 1 }}>
+              <input type="radio" name="model" value="gemini-2.5-flash" checked={selectedModel === 'gemini-2.5-flash'} onChange={(e) => setSelectedModel(e.target.value)} disabled={isUploading} style={{ display: 'none' }} />
+              <div style={{ padding: '0.75rem 1.5rem', borderRadius: '12px', border: `2px solid ${selectedModel === 'gemini-2.5-flash' ? '#3b82f6' : '#cbd5e1'}`, background: selectedModel === 'gemini-2.5-flash' ? '#eff6ff' : 'transparent', transition: 'all 0.2s' }}>
+                <strong style={{ display: 'block', color: '#1e293b', marginBottom: '0.2rem' }}>Flash (권장)</strong>
+                <span style={{ fontSize: '0.8rem', color: '#64748b' }}>균형 / 100만 토큰 한도</span>
+              </div>
+            </label>
+          </div>
+
           <div 
             className={`glass-panel ${styles.dropzone} ${isDragging ? styles.active : ''}`}
             onDragOver={handleDragOver}
@@ -177,20 +247,20 @@ export default function Home() {
             {isUploading ? (
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
                 <Loader2 className={`${styles.uploadIcon} animate-spin`} style={{ animation: 'spin 2s linear infinite' }} />
-                <h3 className={styles.uploadText}>리포트 핵심 구조를 파악하고 있어요...</h3>
-                <p className={styles.uploadSubtext}>목차 및 요약 추출 중 (약 10초)</p>
+                <h3 className={styles.uploadText}>리포트 분석 진행 중...</h3>
+                <p className={styles.uploadSubtext}>주요 목차 및 핵심 내용 스캔 중 (약 10~20초 소요)</p>
               </div>
             ) : file ? (
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
                 <FileText className={styles.uploadIcon} />
                 <h3 className={styles.uploadText}>{file.name}</h3>
-                <p className={styles.uploadSubtext}>클릭하거나 새 파일을 드래그하여 변경</p>
+                <p className={styles.uploadSubtext}>변경하려면 클릭하거나 새 파일을 드래그하세요</p>
               </div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
                 <UploadCloud className={styles.uploadIcon} />
-                <h3 className={styles.uploadText}>여기로 PDF 리포트를 끌어다 놓으세요</h3>
-                <p className={styles.uploadSubtext}>또는 클릭하여 파일 선택 (최대 10MB)</p>
+                <h3 className={styles.uploadText}>PDF 형식의 경제 리포트 업로드</h3>
+                <p className={styles.uploadSubtext}>이곳에 파일을 끌어다 놓거나 클릭하여 선택하세요 (최대 10MB)</p>
               </div>
             )}
           </div>
@@ -204,25 +274,91 @@ export default function Home() {
         </section>
       )}
 
-      {/* 결과 화면 */}
-      {reportData && <ReportResult data={reportData} />}
+      {step === 'select' && tocData && (
+        <section className={`${styles.selectionSection} animate-fade-in`}>
+          <div className={styles.selectionPanel}>
+            <h2 className={styles.selectionTitle}>보고서 요약 및 목차 선택</h2>
+            
+            <div className={styles.summaryBox}>
+              <h3 className={styles.summaryTitle}>📝 핵심 요약</h3>
+              <ul className={styles.summaryList}>
+                {tocData.summary?.map((item: string, idx: number) => (
+                  <li key={idx}>{item}</li>
+                ))}
+              </ul>
+              <h3 className={styles.summaryTitle} style={{ marginTop: '1.5rem' }}>💡 생활 영향</h3>
+              <p style={{ color: '#cbd5e1', lineHeight: '1.7' }}>{tocData.lifeImpact}</p>
+            </div>
+
+            <div className={styles.chapterBox}>
+              <div className={styles.chapterHeader}>
+                <h3 className={styles.chapterTitle}>📖 상세 분석할 챕터 선택</h3>
+                <span className={`${styles.chapterBadge} ${selectedChapters.length === (tocData.isShortReport === true || tocData.isShortReport === 'true' ? 999 : 3) ? styles.chapterBadgeWarning : styles.chapterBadgeActive}`}>
+                  {selectedChapters.length} {tocData.isShortReport === true || tocData.isShortReport === 'true' ? '선택됨' : '/ 3 선택됨'}
+                </span>
+              </div>
+              <p className={styles.chapterDesc}>
+                {tocData.isShortReport === true || tocData.isShortReport === 'true'
+                  ? "분량이 짧은 보고서이므로 제한 없이 모든 챕터를 선택하여 상세 분석할 수 있습니다." 
+                  : "가장 관심 있는 핵심 챕터를 최대 3개까지만 골라주세요. AI가 선택된 챕터에 한해 심층 분석과 차트를 추출합니다."}
+              </p>
+              
+              <div className={styles.chapterList}>
+                {Array.isArray(tocData.chapters) ? tocData.chapters.map((ch: any, idx: number) => {
+                  const chapter = typeof ch === 'string' ? ch : (ch.title || ch.name || JSON.stringify(ch));
+                  const isSelected = selectedChapters.includes(chapter);
+                  const isShort = tocData.isShortReport === true || tocData.isShortReport === 'true';
+                  const limit = isShort ? 999 : 3;
+                  const isDisabled = !isSelected && selectedChapters.length >= limit;
+                  
+                  return (
+                    <div 
+                      key={idx} 
+                      onClick={() => !isDisabled && toggleChapterSelection(chapter)}
+                      className={`${styles.chapterItem} ${isSelected ? styles.chapterItemActive : ''} ${isDisabled ? styles.chapterItemDisabled : ''}`}
+                    >
+                      <div style={{ color: isSelected ? '#38bdf8' : '#64748b' }}>
+                        {isSelected ? <CheckSquare size={24} /> : <Square size={24} />}
+                      </div>
+                      <span style={{ color: isSelected ? '#f8fafc' : '#cbd5e1', fontSize: '1rem', fontWeight: isSelected ? '600' : 'normal' }}>{chapter}</span>
+                    </div>
+                  );
+                }) : (
+                  <p style={{ color: '#fca5a5' }}>목차를 불러오지 못했습니다. 다시 시도해주세요.</p>
+                )}
+              </div>
+            </div>
+
+            {error && (
+              <div style={{ marginBottom: '1.5rem', padding: '1rem', background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.2)', borderRadius: '12px', color: '#fca5a5', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <AlertCircle size={20} />
+                <span>{error}</span>
+              </div>
+            )}
+
+            <div className={styles.actionButtons}>
+              <button onClick={() => setStep('upload')} className={styles.btnCancel}>
+                취소
+              </button>
+              <button 
+                onClick={handleAnalyzeSelected}
+                disabled={selectedChapters.length === 0}
+                className={styles.btnSubmit}
+              >
+                {selectedChapters.length > 0 ? `선택한 ${selectedChapters.length}개 챕터 분석 시작` : '분석할 챕터를 선택해주세요'}
+              </button>
+            </div>
+          </div>
+        </section>
+      )}
+
+      {step === 'analyze' && reportData && <ReportResult data={reportData} />}
       
-      {/* 다시하기 버튼 */}
-      {reportData && (
+      {(step === 'analyze' || step === 'select') && (
         <button 
-          onClick={() => {
-            setReportData(null);
-            setFile(null);
-          }}
+          onClick={resetAll}
           style={{
-            marginTop: '1rem',
-            background: 'transparent',
-            border: '1px solid rgba(255,255,255,0.2)',
-            color: 'white',
-            padding: '0.75rem 1.5rem',
-            borderRadius: '99px',
-            cursor: 'pointer',
-            transition: 'all 0.3s'
+            marginTop: '2rem', background: 'transparent', border: '1px solid rgba(255,255,255,0.2)', color: 'white', padding: '0.75rem 1.5rem', borderRadius: '99px', cursor: 'pointer', transition: 'all 0.3s', display: 'block', margin: '2rem auto 0 auto'
           }}
           onMouseOver={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.05)'}
           onMouseOut={(e) => e.currentTarget.style.background = 'transparent'}
