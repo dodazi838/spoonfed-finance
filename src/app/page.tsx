@@ -213,20 +213,10 @@ export default function Home() {
         <section className={`${styles.uploadSection} animate-fade-in animate-delay-2`}>
           
           <div style={{ display: 'flex', justifyContent: 'center', gap: '1rem', marginBottom: '1.5rem' }}>
-            <label style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', opacity: isUploading ? 0.5 : 1 }}>
-              <input type="radio" name="model" value="gemini-2.5-flash-lite" checked={selectedModel === 'gemini-2.5-flash-lite'} onChange={(e) => setSelectedModel(e.target.value)} disabled={isUploading} style={{ display: 'none' }} />
-              <div style={{ padding: '0.75rem 1.5rem', borderRadius: '12px', border: `2px solid ${selectedModel === 'gemini-2.5-flash-lite' ? '#3b82f6' : '#cbd5e1'}`, background: selectedModel === 'gemini-2.5-flash-lite' ? '#eff6ff' : 'transparent', transition: 'all 0.2s' }}>
-                <strong style={{ display: 'block', color: '#1e293b', marginBottom: '0.2rem' }}>Lite (2.5)</strong>
-                <span style={{ fontSize: '0.8rem', color: '#64748b' }}>초고속 / 100만 토큰 한도</span>
-              </div>
-            </label>
-            <label style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', opacity: isUploading ? 0.5 : 1 }}>
-              <input type="radio" name="model" value="gemini-2.5-flash" checked={selectedModel === 'gemini-2.5-flash'} onChange={(e) => setSelectedModel(e.target.value)} disabled={isUploading} style={{ display: 'none' }} />
-              <div style={{ padding: '0.75rem 1.5rem', borderRadius: '12px', border: `2px solid ${selectedModel === 'gemini-2.5-flash' ? '#3b82f6' : '#cbd5e1'}`, background: selectedModel === 'gemini-2.5-flash' ? '#eff6ff' : 'transparent', transition: 'all 0.2s' }}>
-                <strong style={{ display: 'block', color: '#1e293b', marginBottom: '0.2rem' }}>Flash (권장)</strong>
-                <span style={{ fontSize: '0.8rem', color: '#64748b' }}>균형 / 100만 토큰 한도</span>
-              </div>
-            </label>
+            <div style={{ padding: '0.75rem 1.5rem', borderRadius: '12px', border: `2px solid #3b82f6`, background: '#eff6ff' }}>
+              <strong style={{ display: 'block', color: '#1e293b', marginBottom: '0.2rem' }}>Gemini 2.5 Flash</strong>
+              <span style={{ fontSize: '0.8rem', color: '#64748b' }}>최신 AI 모델 적용 중</span>
+            </div>
           </div>
 
           <div 
@@ -302,6 +292,26 @@ export default function Home() {
                   ? "분량이 짧은 보고서이므로 제한 없이 모든 챕터를 선택하여 상세 분석할 수 있습니다." 
                   : "가장 관심 있는 핵심 챕터를 최대 3개까지만 골라주세요. AI가 선택된 챕터에 한해 심층 분석과 차트를 추출합니다."}
               </p>
+              
+              {(tocData.isShortReport === true || tocData.isShortReport === 'true') && (
+                <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '1rem' }}>
+                  <button 
+                    onClick={() => {
+                      const allChapters = tocData.chapters.map((ch: any) => typeof ch === 'string' ? ch : (ch.title || ch.name || JSON.stringify(ch)));
+                      if (selectedChapters.length === allChapters.length) {
+                        setSelectedChapters([]); // Deselect all
+                      } else {
+                        setSelectedChapters(allChapters); // Select all
+                      }
+                    }}
+                    style={{ background: 'transparent', border: '1px solid #3b82f6', color: '#38bdf8', padding: '0.5rem 1rem', borderRadius: '8px', fontSize: '0.9rem', fontWeight: 600, cursor: 'pointer', transition: 'all 0.2s' }}
+                    onMouseOver={(e) => { e.currentTarget.style.background = 'rgba(59, 130, 246, 0.1)'; }}
+                    onMouseOut={(e) => { e.currentTarget.style.background = 'transparent'; }}
+                  >
+                    {selectedChapters.length === (Array.isArray(tocData.chapters) ? tocData.chapters.length : 0) ? '전체 해제' : '전체 선택하기'}
+                  </button>
+                </div>
+              )}
               
               <div className={styles.chapterList}>
                 {Array.isArray(tocData.chapters) ? tocData.chapters.map((ch: any, idx: number) => {

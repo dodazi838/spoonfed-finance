@@ -79,7 +79,7 @@ export async function POST(req: NextRequest) {
          - 만약 PDF 앞부분에 명시적인 '목차(Table of Contents)' 페이지가 있다면, 적혀있는 텍스트 토씨 하나 틀리지 말고 순서대로 추출하세요.
          - **[중요 예외 처리]** 만약 목차 페이지가 따로 없는 파일이라면, 본문을 훑어보고 글씨 크기가 크거나 진하게 강조된 **'대제목(Section Headers)'** 위주로 스캔하세요. 글 전체의 뼈대가 되는 가장 핵심적인 3~5개의 소주제(섹션 제목)를 직접 찾아내어 목차 형태로 구성해야 합니다. 절대 빈 배열이나 "목차 없음"으로 처리하지 마세요.
          - **[중요]** chapters 배열 안에는 어떠한 객체(Object)도 들어가선 안 되며, 오직 평문 텍스트(String)들만 포함되어야 합니다. (예: ["1. 서론", "2. 본론"])
-      3. lifeImpact: 이 리포트 내용이 대학생의 일상생활(물가, 금리 등)에 어떤 영향을 미치는지 2~3문장으로 요약 설명해주세요.
+      3. lifeImpact: 이 리포트 내용이 특정 집단이 아닌 '일반 대중(직장인, 자영업자, 취업준비생, 가계 전반 등)'의 실제 일상생활(가계 대출 이자, 장바구니 물가, 취업 시장 등)에 어떤 실질적인 영향을 미치는지 2~3문장으로 직관적으로 요약 설명해주세요.
       4. isShortReport: 전체 PDF의 페이지 수를 파악하여, 전체 분량이 15페이지 이하의 짧은 보고서라면 true, 16페이지 이상의 방대한 보고서라면 false를 반환하세요.
 
       [응답 형식 - 반드시 지킬 것]
@@ -92,20 +92,38 @@ export async function POST(req: NextRequest) {
           "2. 금융 및 자산 시장 동향",
           "3. 금융기관 복원력"
         ],
-        "lifeImpact": "금리가 오르면 학자금 대출 이자 부담이 커질 수 있습니다...",
+        "lifeImpact": "금리가 인상됨에 따라 가계의 주택담보대출 이자 부담이 커지고, 기업의 채용 심리가 위축될 수 있습니다...",
         "isShortReport": false
       }
     `;
 
-    const result = await model.generateContent([
-      prompt,
-      {
-        fileData: {
-          fileUri: uploadResult.file.uri,
-          mimeType: uploadResult.file.mimeType
+    const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
+    const result = await (async () => {
+      let retries = 2; // 일일 한도 방전을 막기 위해 재시도 횟수 축소
+      let delay = 15000;
+      for (let i = 0; i < retries; i++) {
+        try {
+          return await model.generateContent([
+            prompt,
+            {
+              fileData: {
+                fileUri: uploadResult.file.uri,
+                mimeType: uploadResult.file.mimeType
+              }
+            }
+          ]);
+        } catch (e: any) {
+          if ((e.status === 503 || e.status === 429) && i < retries - 1) {
+            console.log(`[Retry analyze] API Error ${e.status}. Retrying in ${delay}ms... (Attempt ${i + 1}/${retries})`);
+            await sleep(delay);
+            continue;
+          }
+          throw e;
         }
       }
-    ]);
+      throw new Error("Unreachable");
+    })();
 
     const responseText = result.response.text();
     const usage = result.response.usageMetadata;

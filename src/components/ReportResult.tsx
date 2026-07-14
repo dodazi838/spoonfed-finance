@@ -9,6 +9,9 @@ import {
   XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, LabelList, Legend 
 } from 'recharts';
 import { useState } from 'react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import rehypeRaw from 'rehype-raw';
 import styles from './ReportResult.module.css';
 
 // Corporate Light Theme Colors (e.g., Deep Blue, Teal, Amber, Navy, Purple, Rose)
@@ -127,7 +130,7 @@ ${data.lifeImpact}
             {keys.map((key, idx) => {
               const color = COLORS[idx % COLORS.length];
               return (
-                <Line key={key} type="monotone" dataKey={key} name={key === 'value' ? '수치' : key} stroke={color} strokeWidth={3} dot={{ r: 4, fill: color, strokeWidth: 2 }} activeDot={{ r: 6 }} />
+                <Line key={key} type="monotone" dataKey={key} name={key === 'value' ? '수치' : key} stroke={color} strokeWidth={3} dot={{ r: 4, fill: color, strokeWidth: 2 }} activeDot={{ r: 6 }} isAnimationActive={false} />
               );
             })}
           </LineChart>
@@ -151,6 +154,7 @@ ${data.lifeImpact}
               nameKey="name"
               label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
               labelLine={false}
+              isAnimationActive={false}
             >
               {chart.data.map((entry, index) => (
                 <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
@@ -173,7 +177,7 @@ ${data.lifeImpact}
             {keys.map((key, idx) => {
               const color = COLORS[idx % COLORS.length];
               return (
-                <Area key={key} type="monotone" dataKey={key} name={key === 'value' ? '수치' : key} stroke={color} fillOpacity={0.15} fill={color} />
+                <Area key={key} type="monotone" dataKey={key} name={key === 'value' ? '수치' : key} stroke={color} fillOpacity={0.15} fill={color} isAnimationActive={false} />
               );
             })}
           </AreaChart>
@@ -194,7 +198,7 @@ ${data.lifeImpact}
             {keys.map((key, idx) => {
               const color = COLORS[idx % COLORS.length];
               return (
-                <Bar key={key} dataKey={key} name={key === 'value' ? '수치' : key} fill={color} radius={[4, 4, 0, 0]} barSize={keys.length > 1 ? 25 : 45} />
+                <Bar key={key} dataKey={key} name={key === 'value' ? '수치' : key} fill={color} radius={[4, 4, 0, 0]} barSize={keys.length > 1 ? 25 : 45} isAnimationActive={false} />
               );
             })}
           </BarChart>
@@ -238,8 +242,13 @@ ${data.lifeImpact}
               </div>
             ) : (
               <>
-                <div className={styles.textBlock}>
-                  {section.easyExplanation}
+                <div className={`${styles.textBlock} markdown-content`}>
+                  <ReactMarkdown 
+                    remarkPlugins={[remarkGfm]} 
+                    rehypePlugins={[rehypeRaw]}
+                  >
+                    {section.easyExplanation || ''}
+                  </ReactMarkdown>
                 </div>
 
                 {/* 해당 섹션의 차트들 (Capture-Friendly Layout + Multi-Series) */}
