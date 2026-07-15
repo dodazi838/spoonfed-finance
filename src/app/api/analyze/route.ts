@@ -4,6 +4,7 @@ import { GoogleAIFileManager } from '@google/generative-ai/server';
 import fs from 'fs/promises';
 import path from 'path';
 import os from 'os';
+import pdfParse from 'pdf-parse';
 
 export const maxDuration = 300; // 5분으로 타임아웃 연장
 
@@ -46,6 +47,10 @@ export async function POST(req: NextRequest) {
     // 3. 업로드가 완료되면 임시 파일을 삭제합니다.
     await fs.unlink(tempFilePath).catch(console.error);
 
+    const pdfData = await pdfParse(buffer);
+    const numPages = pdfData.numpages;
+    const isShortReport = numPages <= 10;
+
     // 4. 업로드된 파일의 URI를 사용하여 Gemini 모델에 분석을 요청합니다.
     const model = genAI.getGenerativeModel({ 
       model: selectedModel,
@@ -56,46 +61,74 @@ export async function POST(req: NextRequest) {
         { category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold: HarmBlockThreshold.BLOCK_NONE }
       ],
       generationConfig: { 
-        maxOutputTokens: 8192,
+        maxOutputTokens: isShortReport ? 16384 : 8192,
         temperature: 0.1,
         responseMimeType: 'application/json'
       }
     });
 
-    const prompt = `
+    const shortReportPrompt = `
       당신은 '떠먹여주는 금융경제'라는 서비스의 최고 등급 수석 에디터입니다.
-      주 독자는 경제/금융 용어에 익숙하지 않은 '대학생'들이지만, 문서의 톤앤매너는 반드시 전문적이고 객관적이어야 합니다.
+      첨부된 리포트는 ${numPages}페이지 분량의 짧은 보고서입니다. 
+      아래 JSON 형식에 맞게 리포트 전체를 한 번에 심층 분석하세요.
 
-      [문체 및 작성 가이드라인 - 매우 중요 (어길 시 페널티)]
-      1. 종결어미: 모든 문장은 정중하고 전문적인 '합쇼체'("~습니다", "~합니다", "~양상을 보입니다", "~전망입니다")로 철저히 통일하세요. 
-      2. 금지사항: "~다", "~함" 같은 딱딱한 평어체나, "안녕하세요", "알아볼까요?" 같은 가벼운 유튜버 말투, 기계적인 번역투는 절대 금지합니다.
-      3. 해설 수준: 원본 보고서의 전문적인 팩트와 수치 데이터가 절대 누락되지 않도록 방대하고 꼼꼼하게 담아내되, 경제/금융 용어에 익숙하지 않은 '대학생' 독자가 읽었을 때 마치 친절한 전공 교수님의 강의를 듣는 것처럼 아주 쉽고 완벽하게 이해될 수 있도록 상세히 풀어서 요약/설명하세요.
+      [문체 가이드라인]
+      - 정중하고 전문적인 '합쇼체'("~습니다") 통일. 평어체나 서론 금지.
+      - 전문 용어가 나올 때마다 괄호 안에 대학생도 이해할 쉬운 말로 부연 설명 필수.
 
-      첨부된 한국은행 또는 공공기관의 경제 리포트(PDF) 전체 내용을 바탕으로 아래의 JSON 형식에 맞게 리포트의 핵심 구조를 추출하세요. (차트는 그리지 마세요)
+      [분석 지침]
+      1. summary: 보고서 전체 핵심 요약 (3~5문장)
+      2. lifeImpact: 일반 대중의 일상에 미치는 영향 직관적 요약 (2~3문장)
+      3. sections: 본문을 3~5개의 논리적 챕터(소주제)로 나누어 배열로 반환하세요.
+      
+      **[sections 작성 원칙]**
+      - title: 섹션의 제목
+      - easyExplanation: 해당 섹션의 분석적 요약 및 재구성 내용
+        * 보고서 원문 복사 금지. 핵심 논지, 인과관계 중심 재구성.
+        * 각 문단은 짧고 밀도 있게 (한 문단 5줄 이내).
+        * 소제목(###), 구분선(--- 최대 1회), 핵심 요약 테이블(|항목|내용|) 필수 포함.
+        * 중요 키워드는 **볼드체**, 가장 중요한 결론 문장은 <mark>형광펜</mark> 처리(최대 2곳).
+        * 핵심 통찰 요약문은 인용구(>)로 분리.
+      - charts: 중요한 수치 데이터 추이를 보여주는 트렌드 차트 데이터 (15~20개 데이터 포인트 모두 추출). 정확한 수치 기입. 표의 빈칸/음수 무시 금지. 차트 해설(description)은 원인/배경 및 의미를 설명.
 
-      분석 지침:
-      1. summary: 보고서 전체를 관통하는 핵심 요약(최소 3개~최대 5개 문장)을 작성하세요.
-      2. chapters: 이 보고서의 본문 목차를 반드시 1차원 문자열 배열 형식으로 추출하세요. (최대 7개)
-         - 만약 PDF 앞부분에 명시적인 '목차(Table of Contents)' 페이지가 있다면, 적혀있는 텍스트 토씨 하나 틀리지 말고 순서대로 추출하세요.
-         - **[중요 예외 처리]** 만약 목차 페이지가 따로 없는 파일이라면, 본문을 훑어보고 글씨 크기가 크거나 진하게 강조된 **'대제목(Section Headers)'** 위주로 스캔하세요. 글 전체의 뼈대가 되는 가장 핵심적인 3~5개의 소주제(섹션 제목)를 직접 찾아내어 목차 형태로 구성해야 합니다. 절대 빈 배열이나 "목차 없음"으로 처리하지 마세요.
-         - **[중요]** chapters 배열 안에는 어떠한 객체(Object)도 들어가선 안 되며, 오직 평문 텍스트(String)들만 포함되어야 합니다. (예: ["1. 서론", "2. 본론"])
-      3. lifeImpact: 이 리포트 내용이 특정 집단이 아닌 '일반 대중(직장인, 자영업자, 취업준비생, 가계 전반 등)'의 실제 일상생활(가계 대출 이자, 장바구니 물가, 취업 시장 등)에 어떤 실질적인 영향을 미치는지 2~3문장으로 직관적으로 요약 설명해주세요.
-      4. isShortReport: 전체 PDF의 페이지 수를 파악하여, 전체 분량이 15페이지 이하의 짧은 보고서라면 true, 16페이지 이상의 방대한 보고서라면 false를 반환하세요.
-
-      [응답 형식 - 반드시 지킬 것]
-      군더더기 말 없이 오직 순수한 JSON 형식으로만 응답하세요. (앞뒤로 마크다운 코드블록 기호나 백틱을 절대로 붙이지 마세요.)
-
+      응답은 오직 JSON으로만 반환하세요.
       {
-        "summary": ["핵심 요약 문장 1", "핵심 요약 문장 2", "핵심 요약 문장 3"],
-        "chapters": [
-          "1. 가계 및 기업 신용",
-          "2. 금융 및 자산 시장 동향",
-          "3. 금융기관 복원력"
-        ],
-        "lifeImpact": "금리가 인상됨에 따라 가계의 주택담보대출 이자 부담이 커지고, 기업의 채용 심리가 위축될 수 있습니다...",
+        "summary": ["요약1", "요약2"],
+        "lifeImpact": "영향...",
+        "isShortReport": true,
+        "sections": [
+          {
+            "title": "챕터 제목",
+            "easyExplanation": "마크다운 본문...",
+            "charts": [
+              { "title": "차트명", "type": "bar", "unit": "%", "dataKeys": ["항목1"], "data": [...], "description": "해설" }
+            ]
+          }
+        ]
+      }
+    `;
+
+    const longReportPrompt = `
+      당신은 '떠먹여주는 금융경제'라는 서비스의 최고 등급 수석 에디터입니다.
+      첨부된 리포트는 ${numPages}페이지 분량의 긴 보고서입니다.
+      본문을 읽고 핵심 뼈대만 아래 JSON 형식에 맞게 추출하세요. (차트는 그리지 마세요)
+
+      1. summary: 보고서 전체를 관통하는 핵심 요약(최소 3개~최대 5개 문장)
+      2. chapters: 이 보고서의 본문 목차를 1차원 문자열 배열로 추출 (최대 7개)
+         - 목차 페이지가 없으면 '대제목' 위주로 스캔하여 핵심 소주제 3~5개를 직접 추출
+      3. lifeImpact: 일반 대중의 일상에 미치는 영향 직관적 요약 (2~3문장)
+      
+      군더더기 없이 오직 JSON만 반환하세요.
+      {
+        "summary": ["요약1", "요약2"],
+        "chapters": ["1. 챕터", "2. 챕터"],
+        "lifeImpact": "영향...",
         "isShortReport": false
       }
     `;
+
+    const prompt = isShortReport ? shortReportPrompt : longReportPrompt;
+
 
     const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
@@ -130,24 +163,40 @@ export async function POST(req: NextRequest) {
     
     let parsedData;
     try {
-      // 마크다운 백틱이 혹시라도 섞여 들어왔을 경우 제거
-      let cleanJson = responseText.replace(/^[\s\S]*?\{/, '{').replace(/\}[\s\S]*?$/, '}');
-      parsedData = JSON.parse(cleanJson);
-      
-      // Phase 2(챕터 분석)에서 재사용할 수 있도록 file URI 반환
-      parsedData.fileUri = uploadResult.file.uri;
-      parsedData.mimeType = uploadResult.file.mimeType;
-      
-      // 토큰 사용량 함께 반환
-      if (usage) {
-        parsedData.usage = usage;
+      // 1차: 그대로 파싱 시도
+      parsedData = JSON.parse(responseText);
+    } catch {
+      try {
+        // 2차: 마크다운 코드블록 제거 후 파싱
+        const codeBlockMatch = responseText.match(/```(?:json)?\s*([\s\S]*?)```/);
+        if (codeBlockMatch) {
+          parsedData = JSON.parse(codeBlockMatch[1].trim());
+        } else {
+          // 3차: 첫 번째 { 부터 마지막 } 까지 추출
+          const firstBrace = responseText.indexOf('{');
+          const lastBrace = responseText.lastIndexOf('}');
+          if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+            parsedData = JSON.parse(responseText.substring(firstBrace, lastBrace + 1));
+          } else {
+            throw new Error('No JSON object found in response');
+          }
+        }
+      } catch (parseError) {
+        console.error('JSON Parse Error in analyze:', parseError, 'Raw response:', responseText.substring(0, 500));
+        return NextResponse.json({ error: 'AI가 올바른 JSON 형식을 반환하지 못했습니다. 다시 시도해 주세요.' }, { status: 500 });
       }
-      
-      return NextResponse.json(parsedData);
-    } catch (parseError) {
-      console.error('JSON Parse Error:', parseError, 'Raw response:', responseText);
-      return NextResponse.json({ error: 'AI가 올바른 JSON 형식을 반환하지 못했습니다.' }, { status: 500 });
     }
+      
+    // Phase 2(챕터 분석)에서 재사용할 수 있도록 file URI 반환 (긴 보고서용)
+    parsedData.fileUri = uploadResult.file.uri;
+    parsedData.mimeType = uploadResult.file.mimeType;
+      
+    // 토큰 사용량 함께 반환
+    if (usage) {
+      parsedData.usage = usage;
+    }
+      
+    return NextResponse.json(parsedData);
 
   } catch (error: any) {
     console.error('API Route Error in analyze:', error);

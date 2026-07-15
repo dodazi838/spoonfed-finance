@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { UploadCloud, FileText, Loader2, AlertCircle, CheckSquare, Square } from 'lucide-react';
 import styles from './page.module.css';
 import ReportResult, { ReportData } from '@/components/ReportResult';
@@ -19,6 +19,33 @@ export default function Home() {
   const [reportData, setReportData] = useState<ReportData | null>(null);
   const [selectedModel, setSelectedModel] = useState<string>('gemini-2.5-flash');
   const [sessionTokens, setSessionTokens] = useState<number>(0);
+  const [dailyTokens, setDailyTokens] = useState<number>(0);
+  const [isClient, setIsClient] = useState(false);
+
+  // Initialize localStorage on mount
+  useEffect(() => {
+    setIsClient(true);
+    const storedStr = localStorage.getItem('spoonfed_daily_tokens');
+    const storedDate = localStorage.getItem('spoonfed_token_date');
+    const todayStr = new Date().toDateString(); // Simplified daily reset
+    
+    if (storedDate === todayStr && storedStr) {
+      setDailyTokens(parseInt(storedStr, 10));
+    } else {
+      localStorage.setItem('spoonfed_daily_tokens', '0');
+      localStorage.setItem('spoonfed_token_date', todayStr);
+      setDailyTokens(0);
+    }
+  }, []);
+
+  const trackTokens = (newTokens: number) => {
+    setSessionTokens(prev => prev + newTokens);
+    setDailyTokens(prev => {
+      const updated = prev + newTokens;
+      localStorage.setItem('spoonfed_daily_tokens', updated.toString());
+      return updated;
+    });
+  };
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -80,11 +107,25 @@ export default function Home() {
       }
 
       if (data.usage?.totalTokenCount) {
-        setSessionTokens(prev => prev + data.usage.totalTokenCount);
+        trackTokens(data.usage.totalTokenCount);
       }
 
-      setTocData(data);
-      setStep('select');
+      if (data.isShortReport === true || data.isShortReport === 'true') {
+        // 짧은 보고서는 목차 선택 없이 바로 결과 화면으로 직행
+        const initialData: ReportData = {
+          summary: data.summary || [],
+          lifeImpact: data.lifeImpact || '',
+          sections: data.sections || [],
+          usage: data.usage
+        };
+        setReportData(initialData);
+        setStep('analyze');
+      } else {
+        // 긴 보고서는 기존처럼 목차 선택 화면으로 이동
+        setTocData(data);
+        setStep('select');
+      }
+      
       setIsUploading(false);
     } catch (err: any) {
       setError(err.message || '알 수 없는 오류가 발생했습니다.');
@@ -150,7 +191,7 @@ export default function Home() {
         const chapterData = await chapterRes.json();
         
         if (chapterData.usage?.totalTokenCount) {
-          setSessionTokens(prev => prev + chapterData.usage.totalTokenCount);
+          trackTokens(chapterData.usage.totalTokenCount);
         }
 
         setReportData(prev => {
@@ -191,9 +232,28 @@ export default function Home() {
   return (
     <main className={styles.container}>
       
-      {sessionTokens > 0 && (
-        <div style={{ position: 'fixed', top: '1rem', right: '1rem', background: 'rgba(15, 23, 42, 0.8)', backdropFilter: 'blur(10px)', border: '1px solid #334155', padding: '0.5rem 1rem', borderRadius: '99px', color: '#38bdf8', fontSize: '0.85rem', fontWeight: 600, zIndex: 100, boxShadow: '0 4px 12px rgba(0,0,0,0.2)' }}>
-          세션 토큰 소모량: {sessionTokens.toLocaleString()}
+      {/* 글로벌 토큰 위젯 (우측 상단 고정) */}
+      {isClient && (
+        <div style={{ 
+          position: 'fixed', top: '1.5rem', right: '1.5rem', 
+          background: 'rgba(255, 255, 255, 0.95)', backdropFilter: 'blur(10px)', 
+          border: '1px solid #e2e8f0', padding: '1rem', borderRadius: '12px', 
+          zIndex: 100, boxShadow: '0 4px 20px rgba(0,0,0,0.08)', width: '280px' 
+        }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.6rem', alignItems: 'flex-end' }}>
+            <span style={{ fontSize: '0.85rem', fontWeight: 600, color: '#475569' }}>일일 무료 한도 (1M)</span>
+            <span style={{ fontSize: '0.8rem', color: '#64748b' }}>
+              <strong style={{ color: '#2563eb' }}>{(dailyTokens / 1000).toFixed(1)}k</strong> / 1,000k
+            </span>
+          </div>
+          <div style={{ width: '100%', height: '6px', backgroundColor: '#e2e8f0', borderRadius: '99px', overflow: 'hidden' }}>
+            <div style={{ 
+              width: `${Math.min((dailyTokens / 1000000) * 100, 100)}%`, 
+              height: '100%', 
+              backgroundColor: dailyTokens > 800000 ? '#ef4444' : dailyTokens > 500000 ? '#f59e0b' : '#2563eb',
+              transition: 'width 0.5s ease-out, background-color 0.5s'
+            }} />
+          </div>
         </div>
       )}
 

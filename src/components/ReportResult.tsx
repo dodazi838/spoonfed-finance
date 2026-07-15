@@ -227,9 +227,9 @@ ${data.lifeImpact}
 
       {/* 목차별 상세 분석 */}
       {data.sections?.map((section, idx) => (
-        <div key={idx} className={styles.sectionWrapper} style={{ marginBottom: '2.5rem' }}>
+        <div key={idx} className={styles.sectionWrapper} style={{ marginBottom: '1.25rem' }}>
           
-          <section className={styles.section} style={{ marginBottom: '1.5rem' }}>
+          <section className={styles.section}>
             <div className={styles.sectionHeader}>
               <BookOpen className={styles.icon} size={28} />
               <h2 className={styles.sectionTitle}>{section.title}</h2>
@@ -253,7 +253,7 @@ ${data.lifeImpact}
 
                 {/* 해당 섹션의 차트들 (Capture-Friendly Layout + Multi-Series) */}
                 {section.charts && section.charts.length > 0 && (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', marginTop: '1.5rem' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginTop: '1rem' }}>
                     {section.charts.map((chart, chartIdx) => (
                       <div key={chartIdx} className={styles.chartCard}>
                         <div className={styles.chartHeader}>
@@ -308,8 +308,41 @@ ${data.lifeImpact}
       </div>
       
       {totalTokens > 0 && (
-        <div style={{ textAlign: 'center', marginTop: '1rem', color: '#94a3b8', fontSize: '0.9rem' }}>
-          현재 세션 AI 토큰 사용량: <strong>{totalTokens.toLocaleString()}</strong> Tokens
+        <div style={{ 
+          marginTop: '2rem', 
+          padding: '1.5rem', 
+          backgroundColor: '#f8fafc', 
+          borderRadius: '12px',
+          border: '1px solid #e2e8f0'
+        }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.75rem', alignItems: 'flex-end' }}>
+            <span style={{ fontSize: '0.95rem', fontWeight: 600, color: '#475569' }}>
+              현재 세션 누적 토큰 사용량 (Gemini 2.5 Flash 무료 티어)
+            </span>
+            <span style={{ fontSize: '0.9rem', color: '#64748b' }}>
+              <strong style={{ color: '#2563eb', fontSize: '1.05rem' }}>{totalTokens.toLocaleString()}</strong> / 1,000,000 (일일 한도)
+            </span>
+          </div>
+          
+          {/* Progress Bar Container */}
+          <div style={{ 
+            width: '100%', 
+            height: '10px', 
+            backgroundColor: '#e2e8f0', 
+            borderRadius: '99px',
+            overflow: 'hidden'
+          }}>
+            <div style={{ 
+              width: `${Math.min((totalTokens / 1000000) * 100, 100)}%`, 
+              height: '100%', 
+              backgroundColor: totalTokens > 800000 ? '#ef4444' : totalTokens > 500000 ? '#f59e0b' : '#2563eb',
+              transition: 'width 0.5s ease-out, background-color 0.5s'
+            }} />
+          </div>
+          
+          <div style={{ marginTop: '0.6rem', fontSize: '0.8rem', color: '#94a3b8', textAlign: 'right' }}>
+            * 일일 한도는 매일 자정(태평양 표준시 기준)에 초기화됩니다.
+          </div>
         </div>
       )}
 

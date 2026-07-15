@@ -27,7 +27,7 @@ export async function POST(req: NextRequest) {
         { category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold: HarmBlockThreshold.BLOCK_NONE }
       ],
       generationConfig: { 
-        maxOutputTokens: 8192,
+        maxOutputTokens: 16384,
         temperature: 0.1,
         responseMimeType: 'application/json'
       }
@@ -45,13 +45,21 @@ export async function POST(req: NextRequest) {
 
       첨부된 한국은행 또는 공공기관의 경제 리포트(PDF) 전체 내용 중, 사용자가 핵심적으로 골라낸 **"${chapterTitle}"** 챕터 단 하나만을 집중적으로 초정밀 심층 분석하세요.
 
-      1. **easyExplanation**: 위 문체 가이드라인을 엄격히 지키면서, 보고서의 내용(특히 차트와 관련된 분석 내용 포함)이 누락되지 않고 대학생 독자에게 매우 쉽게 전달되도록 아주 상세하고 깊이 있게 해설하세요.
-         **[시각적 가독성 극대화 (Rich Markdown) 규칙] - 프리미엄 에디토리얼 스타일**
-         - 화려한 색상 태그(형광펜, 글자색 등) 사용을 **전면 금지**합니다. 모노톤의 절제된 고급스러움을 지향하세요.
-         - **강조 표기**: 문단 내 핵심 키워드나 결론은 깔끔하게 **볼드체(**텍스트**)**만 적용하세요.
-         - **인사이트 박스(중요)**: 해당 챕터에서 가장 핵심이 되는 통찰이나 요약 문장(1~2문장)은 반드시 마크다운 인용구(\`>\`)로 빼내어 작성하세요. (렌더링 시 세련된 요약 박스로 표시됩니다.)
-         - **표(Table)**: 전년 대비 변화율 등 텍스트로 나열하기보다 표로 비교하는 것이 명확한 데이터는 마크다운 표(\`|구분|내용|\`) 형식으로 삽입하세요.
-         - **목록(List)**: 3가지 이상의 특징이나 나열식 설명은 글머리 기호(\`-\`)를 사용하세요.
+      1. **easyExplanation**: 위 문체 가이드라인을 엄격히 지키면서, 해당 챕터의 내용을 **분석적으로 요약·재구성**하세요.
+         [작성 원칙]
+         - 보고서 원문을 그대로 복사·붙여넣기하는 것을 절대 금지합니다. 핵심 논지를 추출하고, 맥락과 인과관계를 연결하여 독자가 '왜 이런 현상이 발생했고, 앞으로 어떤 의미를 갖는지'를 자연스럽게 이해할 수 있도록 재구성하세요.
+         - 원본의 주요 수치, 팩트, 데이터는 절대 누락하지 마세요. 단, 나열식이 아닌 분석적 흐름 속에 녹여내세요.
+         - **쉬운 말로 풀어쓰기(필수)**: 대학생 독자가 따로 검색하지 않고도 이해할 수 있도록, 전문 용어가 나올 때마다 반드시 쉼운 말로 부연 설명을 덧붙이세요. (예: "기준금리(한국은행이 시중에 도는 이자율의 기준이 되는 금리)를 인상했습니다.")
+         - 문단은 짧고 밀도 있게 작성하세요. 한 문단이 5줄을 넘기지 않도록 하세요.
+         [구조적 가독성 규칙]
+         - **소제목(필수)**: 긴 줄글로만 구성하는 것을 절대 금지합니다. 내용을 3~5개의 소주제로 나누고, 각 소주제마다 마크다운 소제목(\`### 소제목\`)을 붙이세요.
+         - **구분선(---) 사용 제한**: 수평선(\`---\`)은 전체 글에서 최대 1회만 사용하세요. 소제목(\`###\`)이 이미 구분 역할을 하므로 남발하지 마세요.
+         - **요약 테이블**: 챕터의 핵심 포인트를 압축한 요약 표(\`|항목|내용|\`)를 포함하세요. 원본에 표가 없더라도 핵심 포인트를 직접 정리하여 만드세요.
+         [시각적 가독성 (Rich Markdown) 규칙]
+         - **볼드체**: 독자가 빠르게 훑어볼 때 눈에 걸려야 하는 **핵심 결론, 수치, 경제 용어**에만 적용하세요.
+         - **형광펜**: 챕터 전체를 통틀어 가장 중요한 판단·결론 문장(최대 2~3곳)에만 \`<mark>핵심 문장</mark>\`을 사용하세요.
+         - **인사이트 박스**: 핵심 통찰을 1~2문장으로 압축한 요약문은 마크다운 인용구(\`>\`)로 분리하세요.
+         - **목록(List)**: 3가지 이상의 항목은 글머리 기호(\`-\`)를 사용하세요.
       2. **charts**: 해당 챕터에 수치 데이터(표, 그래프)가 있다면 가장 중요한 핵심 지표 위주로 차트를 생성하세요. 기존의 '데이터 포인트 5개 제한'은 완전히 폐지되었습니다. **시계열 데이터 등 추이를 보여주는 자료라면 15~20개의 연속된 데이터 포인트라도 모두 추출하여 완벽한 트렌드 차트를 구성하세요.**
       3. **[차트 해설(description) 규칙]**: 차트의 형태(상승/하락)만을 단순 묘사하는 것을 절대 금지합니다. 대신 보고서 본문 내용을 바탕으로 **① '왜 그래프가 이러한 형태(원인/배경)를 띠게 되었는지'**와 **② '이 그래프가 의미하는 바가 구체적으로 무엇인지'**를 명확하게 1~3문장으로 설명하세요. (예: "물가 상승 압력에 대응하기 위해 중앙은행이 기준금리를 인상함에 따라 해당 수치가 급증한 모습이며, 이는 기업의 자금 조달 환경이 악화되고 있음을 의미합니다.")
       
@@ -117,12 +125,34 @@ export async function POST(req: NextRequest) {
     
     let parsedData;
     try {
-      // 마크다운 백틱이 혹시라도 섞여 들어왔을 경우 제거
-      let cleanJson = responseText.replace(/^[\\s\\S]*?\\{/, '{').replace(/\\}[\\s\\S]*?$/, '}');
-      parsedData = JSON.parse(cleanJson);
-    } catch (parseError) {
-      console.error('JSON Parse Error in analyze-chapter:', parseError, 'Raw response:', responseText);
-      return NextResponse.json({ error: 'AI가 올바른 JSON 형식을 반환하지 못했습니다 (Chapter).' }, { status: 500 });
+      // 1차: 그대로 파싱 시도
+      parsedData = JSON.parse(responseText);
+    } catch {
+      try {
+        // 2차: 마크다운 코드블록(```json ... ```) 제거 후 파싱
+        const codeBlockMatch = responseText.match(/```(?:json)?\s*([\s\S]*?)```/);
+        if (codeBlockMatch) {
+          parsedData = JSON.parse(codeBlockMatch[1].trim());
+        } else {
+          // 3차: 첫 번째 { 부터 마지막 } 까지 추출 후 파싱
+          const firstBrace = responseText.indexOf('{');
+          const lastBrace = responseText.lastIndexOf('}');
+          if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+            parsedData = JSON.parse(responseText.substring(firstBrace, lastBrace + 1));
+          } else {
+            throw new Error('No JSON object found in response');
+          }
+        }
+      } catch (parseError) {
+        console.error('JSON Parse Error in analyze-chapter:', parseError, 'Raw response (first 1000 chars):', responseText.substring(0, 1000));
+        // 4차 최후방어: JSON 파싱 실패 시에도 원문 텍스트를 그대로 보여줌
+        return NextResponse.json({
+          title: chapterTitle,
+          easyExplanation: responseText || 'AI 응답을 파싱하지 못했습니다.',
+          charts: [],
+          usage
+        });
+      }
     }
 
     return NextResponse.json({
