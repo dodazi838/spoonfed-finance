@@ -122,3 +122,133 @@
 .btnSubmit { background: var(--primary); border: none; color: #0f172a; padding: 0.875rem 2.5rem; border-radius: 99px; cursor: pointer; font-weight: 700; transition: all 0.3s; font-size: 1rem; box-shadow: 0 4px 14px 0 rgba(59, 130, 246, 0.39); }
 .btnSubmit:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(59, 130, 246, 0.23); }
 .btnSubmit:disabled { background: #334155; color: #94a3b8; box-shadow: none; cursor: not-allowed; }
+
+/* ─── 토큰 위젯 (우측 상단 고정) ─── */
+.tokenWidget {
+  position: fixed;
+  top: 1.5rem;
+  right: 1.5rem;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(10px);
+  border: 1px solid #e2e8f0;
+  padding: 1rem;
+  border-radius: 12px;
+  z-index: 100;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+  width: 280px;
+}
+.tokenWidgetHeader {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 0.6rem;
+  align-items: flex-end;
+}
+.tokenWidgetLabel {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #475569;
+}
+.tokenWidgetValue {
+  font-size: 0.8rem;
+  color: #64748b;
+}
+.tokenWidgetValueStrong {
+  color: #2563eb;
+  font-weight: 700;
+}
+.tokenWidgetTrack {
+  width: 100%;
+  height: 6px;
+  background-color: #e2e8f0;
+  border-radius: 99px;
+  overflow: hidden;
+}
+
+/* ─── 모델 배지 ─── */
+.modelBadgeContainer {
+  display: flex;
+  justify-content: center;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+.modelBadge {
+  padding: 0.75rem 1.5rem;
+  border-radius: 12px;
+  border: 2px solid #3b82f6;
+  background: #eff6ff;
+}
+.modelBadgeName {
+  display: block;
+  color: #1e293b;
+  margin-bottom: 0.2rem;
+  font-weight: 700;
+}
+.modelBadgeDesc {
+  font-size: 0.8rem;
+  color: #64748b;
+}
+
+/* ─── 에러 박스 ─── */
+.errorBox {
+  margin-top: 1rem;
+  padding: 1rem;
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.2);
+  border-radius: 12px;
+  color: #fca5a5;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  justify-content: center;
+}
+.errorBoxInline {
+  margin-bottom: 1.5rem;
+  padding: 1rem;
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.2);
+  border-radius: 12px;
+  color: #fca5a5;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+/* ─── 로딩 및 파일 상태 ─── */
+.centeredColumn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+/* ─── 리셋 버튼 ─── */
+.resetButton {
+  margin: 2rem auto 0 auto;
+  display: block;
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: white;
+  padding: 0.75rem 1.5rem;
+  border-radius: 99px;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+.resetButton:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+/* ─── 전체 선택 버튼 ─── */
+.selectAllBtn {
+  background: transparent;
+  border: 1px solid #3b82f6;
+  color: #38bdf8;
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.selectAllBtn:hover {
+  background: rgba(59, 130, 246, 0.1);
+}
+

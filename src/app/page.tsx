@@ -5,7 +5,24 @@ import { UploadCloud, FileText, Loader2, AlertCircle, CheckSquare, Square } from
 import styles from './page.module.css';
 import ReportResult, { ReportData } from '@/components/ReportResult';
 
+// ─── 타입 정의 ───
 type Step = 'upload' | 'select' | 'analyze';
+
+interface TocData {
+  summary: string[];
+  chapters: string[];
+  lifeImpact: string;
+  isShortReport: boolean | string;
+  sections?: any[];
+  fileUri: string;
+  mimeType: string;
+  usage?: { totalTokenCount: number };
+}
+
+// ─── 헬퍼 함수 ───
+function checkIsShortReport(data: TocData | null): boolean {
+  return data?.isShortReport === true || data?.isShortReport === 'true';
+}
 
 export default function Home() {
   const [step, setStep] = useState<Step>('upload');
@@ -14,20 +31,19 @@ export default function Home() {
   const [isUploading, setIsUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   
-  const [tocData, setTocData] = useState<any>(null);
+  const [tocData, setTocData] = useState<TocData | null>(null);
   const [selectedChapters, setSelectedChapters] = useState<string[]>([]);
   const [reportData, setReportData] = useState<ReportData | null>(null);
-  const [selectedModel, setSelectedModel] = useState<string>('gemini-2.5-flash');
-  const [sessionTokens, setSessionTokens] = useState<number>(0);
+  const [selectedModel] = useState<string>('gemini-2.5-flash');
   const [dailyTokens, setDailyTokens] = useState<number>(0);
   const [isClient, setIsClient] = useState(false);
 
-  // Initialize localStorage on mount
+  // localStorage 초기화
   useEffect(() => {
     setIsClient(true);
     const storedStr = localStorage.getItem('spoonfed_daily_tokens');
     const storedDate = localStorage.getItem('spoonfed_token_date');
-    const todayStr = new Date().toDateString(); // Simplified daily reset
+    const todayStr = new Date().toDateString();
     
     if (storedDate === todayStr && storedStr) {
       setDailyTokens(parseInt(storedStr, 10));
@@ -39,7 +55,6 @@ export default function Home() {
   }, []);
 
   const trackTokens = (newTokens: number) => {
-    setSessionTokens(prev => prev + newTokens);
     setDailyTokens(prev => {
       const updated = prev + newTokens;
       localStorage.setItem('spoonfed_daily_tokens', updated.toString());
@@ -47,6 +62,7 @@ export default function Home() {
     });
   };
 
+  // ─── 파일 핸들링 ───
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     setIsDragging(true);
@@ -111,7 +127,6 @@ export default function Home() {
       }
 
       if (data.isShortReport === true || data.isShortReport === 'true') {
-        // 짧은 보고서는 목차 선택 없이 바로 결과 화면으로 직행
         const initialData: ReportData = {
           summary: data.summary || [],
           lifeImpact: data.lifeImpact || '',
@@ -121,7 +136,6 @@ export default function Home() {
         setReportData(initialData);
         setStep('analyze');
       } else {
-        // 긴 보고서는 기존처럼 목차 선택 화면으로 이동
         setTocData(data);
         setStep('select');
       }
@@ -135,16 +149,14 @@ export default function Home() {
     }
   };
 
+  // ─── 챕터 선택 ───
   const toggleChapterSelection = (chapter: string) => {
     setSelectedChapters(prev => {
       if (prev.includes(chapter)) {
         return prev.filter(c => c !== chapter);
       }
-      const isShort = tocData?.isShortReport === true || tocData?.isShortReport === 'true';
-      const limit = isShort ? 999 : 3;
-      if (prev.length >= limit) {
-        return prev;
-      }
+      const limit = checkIsShortReport(tocData) ? 999 : 3;
+      if (prev.length >= limit) return prev;
       return [...prev, chapter];
     });
   };
@@ -164,11 +176,11 @@ export default function Home() {
     }));
 
     const initialData: ReportData = {
-      summary: tocData.summary || [],
-      lifeImpact: tocData.lifeImpact || '',
+      summary: tocData?.summary || [],
+      lifeImpact: tocData?.lifeImpact || '',
       sections: initialSections,
-      fileUri: tocData.fileUri,
-      mimeType: tocData.mimeType,
+      fileUri: tocData?.fileUri,
+      mimeType: tocData?.mimeType,
     };
 
     setReportData(initialData);
@@ -181,8 +193,8 @@ export default function Home() {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            fileUri: tocData.fileUri,
-            mimeType: tocData.mimeType,
+            fileUri: tocData?.fileUri,
+            mimeType: tocData?.mimeType,
             chapterTitle: chapterTitle,
             modelName: selectedModel
           })
@@ -229,28 +241,28 @@ export default function Home() {
     setError(null);
   };
 
+  // ─── 렌더링 ───
+  const isShort = checkIsShortReport(tocData);
+  const chapterLimit = isShort ? 999 : 3;
+  const tokenPercent = Math.min((dailyTokens / 1000000) * 100, 100);
+  const tokenColor = dailyTokens > 800000 ? '#ef4444' : dailyTokens > 500000 ? '#f59e0b' : '#2563eb';
+
   return (
     <main className={styles.container}>
       
-      {/* 글로벌 토큰 위젯 (우측 상단 고정) */}
+      {/* 글로벌 토큰 위젯 */}
       {isClient && (
-        <div style={{ 
-          position: 'fixed', top: '1.5rem', right: '1.5rem', 
-          background: 'rgba(255, 255, 255, 0.95)', backdropFilter: 'blur(10px)', 
-          border: '1px solid #e2e8f0', padding: '1rem', borderRadius: '12px', 
-          zIndex: 100, boxShadow: '0 4px 20px rgba(0,0,0,0.08)', width: '280px' 
-        }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.6rem', alignItems: 'flex-end' }}>
-            <span style={{ fontSize: '0.85rem', fontWeight: 600, color: '#475569' }}>일일 무료 한도 (1M)</span>
-            <span style={{ fontSize: '0.8rem', color: '#64748b' }}>
-              <strong style={{ color: '#2563eb' }}>{(dailyTokens / 1000).toFixed(1)}k</strong> / 1,000k
+        <div className={styles.tokenWidget}>
+          <div className={styles.tokenWidgetHeader}>
+            <span className={styles.tokenWidgetLabel}>일일 무료 한도 (1M)</span>
+            <span className={styles.tokenWidgetValue}>
+              <strong className={styles.tokenWidgetValueStrong}>{(dailyTokens / 1000).toFixed(1)}k</strong> / 1,000k
             </span>
           </div>
-          <div style={{ width: '100%', height: '6px', backgroundColor: '#e2e8f0', borderRadius: '99px', overflow: 'hidden' }}>
+          <div className={styles.tokenWidgetTrack}>
             <div style={{ 
-              width: `${Math.min((dailyTokens / 1000000) * 100, 100)}%`, 
-              height: '100%', 
-              backgroundColor: dailyTokens > 800000 ? '#ef4444' : dailyTokens > 500000 ? '#f59e0b' : '#2563eb',
+              width: `${tokenPercent}%`, height: '100%', 
+              backgroundColor: tokenColor,
               transition: 'width 0.5s ease-out, background-color 0.5s'
             }} />
           </div>
@@ -272,10 +284,10 @@ export default function Home() {
       {step === 'upload' && (
         <section className={`${styles.uploadSection} animate-fade-in animate-delay-2`}>
           
-          <div style={{ display: 'flex', justifyContent: 'center', gap: '1rem', marginBottom: '1.5rem' }}>
-            <div style={{ padding: '0.75rem 1.5rem', borderRadius: '12px', border: `2px solid #3b82f6`, background: '#eff6ff' }}>
-              <strong style={{ display: 'block', color: '#1e293b', marginBottom: '0.2rem' }}>Gemini 2.5 Flash</strong>
-              <span style={{ fontSize: '0.8rem', color: '#64748b' }}>최신 AI 모델 적용 중</span>
+          <div className={styles.modelBadgeContainer}>
+            <div className={styles.modelBadge}>
+              <strong className={styles.modelBadgeName}>Gemini 2.5 Flash</strong>
+              <span className={styles.modelBadgeDesc}>최신 AI 모델 적용 중</span>
             </div>
           </div>
 
@@ -295,19 +307,19 @@ export default function Home() {
             />
             
             {isUploading ? (
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                <Loader2 className={`${styles.uploadIcon} animate-spin`} style={{ animation: 'spin 2s linear infinite' }} />
+              <div className={styles.centeredColumn}>
+                <Loader2 className={styles.uploadIcon} style={{ animation: 'spin 2s linear infinite' }} />
                 <h3 className={styles.uploadText}>리포트 분석 진행 중...</h3>
                 <p className={styles.uploadSubtext}>주요 목차 및 핵심 내용 스캔 중 (약 10~20초 소요)</p>
               </div>
             ) : file ? (
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+              <div className={styles.centeredColumn}>
                 <FileText className={styles.uploadIcon} />
                 <h3 className={styles.uploadText}>{file.name}</h3>
                 <p className={styles.uploadSubtext}>변경하려면 클릭하거나 새 파일을 드래그하세요</p>
               </div>
             ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+              <div className={styles.centeredColumn}>
                 <UploadCloud className={styles.uploadIcon} />
                 <h3 className={styles.uploadText}>PDF 형식의 경제 리포트 업로드</h3>
                 <p className={styles.uploadSubtext}>이곳에 파일을 끌어다 놓거나 클릭하여 선택하세요 (최대 10MB)</p>
@@ -316,7 +328,7 @@ export default function Home() {
           </div>
           
           {error && (
-            <div style={{ marginTop: '1rem', padding: '1rem', background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.2)', borderRadius: '12px', color: '#fca5a5', display: 'flex', alignItems: 'center', gap: '0.5rem', justifyContent: 'center' }}>
+            <div className={styles.errorBox}>
               <AlertCircle size={20} />
               <span>{error}</span>
             </div>
@@ -343,30 +355,24 @@ export default function Home() {
             <div className={styles.chapterBox}>
               <div className={styles.chapterHeader}>
                 <h3 className={styles.chapterTitle}>📖 상세 분석할 챕터 선택</h3>
-                <span className={`${styles.chapterBadge} ${selectedChapters.length === (tocData.isShortReport === true || tocData.isShortReport === 'true' ? 999 : 3) ? styles.chapterBadgeWarning : styles.chapterBadgeActive}`}>
-                  {selectedChapters.length} {tocData.isShortReport === true || tocData.isShortReport === 'true' ? '선택됨' : '/ 3 선택됨'}
+                <span className={`${styles.chapterBadge} ${selectedChapters.length === chapterLimit ? styles.chapterBadgeWarning : styles.chapterBadgeActive}`}>
+                  {selectedChapters.length} {isShort ? '선택됨' : '/ 3 선택됨'}
                 </span>
               </div>
               <p className={styles.chapterDesc}>
-                {tocData.isShortReport === true || tocData.isShortReport === 'true'
+                {isShort
                   ? "분량이 짧은 보고서이므로 제한 없이 모든 챕터를 선택하여 상세 분석할 수 있습니다." 
                   : "가장 관심 있는 핵심 챕터를 최대 3개까지만 골라주세요. AI가 선택된 챕터에 한해 심층 분석과 차트를 추출합니다."}
               </p>
               
-              {(tocData.isShortReport === true || tocData.isShortReport === 'true') && (
+              {isShort && (
                 <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '1rem' }}>
                   <button 
                     onClick={() => {
                       const allChapters = tocData.chapters.map((ch: any) => typeof ch === 'string' ? ch : (ch.title || ch.name || JSON.stringify(ch)));
-                      if (selectedChapters.length === allChapters.length) {
-                        setSelectedChapters([]); // Deselect all
-                      } else {
-                        setSelectedChapters(allChapters); // Select all
-                      }
+                      setSelectedChapters(selectedChapters.length === allChapters.length ? [] : allChapters);
                     }}
-                    style={{ background: 'transparent', border: '1px solid #3b82f6', color: '#38bdf8', padding: '0.5rem 1rem', borderRadius: '8px', fontSize: '0.9rem', fontWeight: 600, cursor: 'pointer', transition: 'all 0.2s' }}
-                    onMouseOver={(e) => { e.currentTarget.style.background = 'rgba(59, 130, 246, 0.1)'; }}
-                    onMouseOut={(e) => { e.currentTarget.style.background = 'transparent'; }}
+                    className={styles.selectAllBtn}
                   >
                     {selectedChapters.length === (Array.isArray(tocData.chapters) ? tocData.chapters.length : 0) ? '전체 해제' : '전체 선택하기'}
                   </button>
@@ -377,9 +383,7 @@ export default function Home() {
                 {Array.isArray(tocData.chapters) ? tocData.chapters.map((ch: any, idx: number) => {
                   const chapter = typeof ch === 'string' ? ch : (ch.title || ch.name || JSON.stringify(ch));
                   const isSelected = selectedChapters.includes(chapter);
-                  const isShort = tocData.isShortReport === true || tocData.isShortReport === 'true';
-                  const limit = isShort ? 999 : 3;
-                  const isDisabled = !isSelected && selectedChapters.length >= limit;
+                  const isDisabled = !isSelected && selectedChapters.length >= chapterLimit;
                   
                   return (
                     <div 
@@ -400,7 +404,7 @@ export default function Home() {
             </div>
 
             {error && (
-              <div style={{ marginBottom: '1.5rem', padding: '1rem', background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.2)', borderRadius: '12px', color: '#fca5a5', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <div className={styles.errorBoxInline}>
                 <AlertCircle size={20} />
                 <span>{error}</span>
               </div>
@@ -425,21 +429,10 @@ export default function Home() {
       {step === 'analyze' && reportData && <ReportResult data={reportData} />}
       
       {(step === 'analyze' || step === 'select') && (
-        <button 
-          onClick={resetAll}
-          style={{
-            marginTop: '2rem', background: 'transparent', border: '1px solid rgba(255,255,255,0.2)', color: 'white', padding: '0.75rem 1.5rem', borderRadius: '99px', cursor: 'pointer', transition: 'all 0.3s', display: 'block', margin: '2rem auto 0 auto'
-          }}
-          onMouseOver={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.05)'}
-          onMouseOut={(e) => e.currentTarget.style.background = 'transparent'}
-        >
+        <button onClick={resetAll} className={styles.resetButton}>
           다른 리포트 분석하기
         </button>
       )}
-
-      <style dangerouslySetInnerHTML={{__html: `
-        @keyframes spin { 100% { transform: rotate(360deg); } }
-      `}} />
     </main>
   );
 }
