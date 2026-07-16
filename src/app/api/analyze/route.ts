@@ -40,7 +40,7 @@ export async function POST(req: NextRequest) {
     });
 
     // 3. 페이지 수 판별 (파일 삭제 전에 수행)
-    const parser = new PDFParse(tempFilePath);
+    const parser = new PDFParse({ url: tempFilePath });
     const pdfData = await parser.parse();
     const numPages = pdfData.pages.length;
     const isShortReport = numPages <= 10;
