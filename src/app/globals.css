@@ -133,11 +133,10 @@ a {
   color: #0f172a;
 }
 .markdown-content blockquote {
-  padding: 0.8rem 1.1rem;
-  background-color: #eff6ff;
-  border-left: 4px solid #2563eb;
-  border-radius: 0 12px 12px 0;
-  width: fit-content;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  border-radius: 12px;
+  padding: 1.25rem;
   font-size: 1.1rem;
   font-weight: 600;
   color: #1e293b;
@@ -161,7 +160,8 @@ a {
 .markdown-content li::marker {
   color: #64748b;
 }
-.markdown-content p:empty {
+.markdown-content p:empty,
+.markdown-content p:has(> br:only-child) {
   display: none !important;
 }
 .markdown-content table {
