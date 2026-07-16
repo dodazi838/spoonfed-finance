@@ -137,6 +137,7 @@ a {
   background-color: #eff6ff;
   border-left: 4px solid #2563eb;
   border-radius: 0 12px 12px 0;
+  width: fit-content;
   font-size: 1.1rem;
   font-weight: 600;
   color: #1e293b;
@@ -160,8 +161,7 @@ a {
 .markdown-content li::marker {
   color: #64748b;
 }
-.markdown-content p:empty,
-.markdown-content p:has(> br:only-child) {
+.markdown-content p:empty {
   display: none !important;
 }
 .markdown-content table {
