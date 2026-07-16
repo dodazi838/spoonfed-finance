@@ -271,7 +271,8 @@
 :global(.markdown-content li::marker) {
   color: #64748b; 
 }
-:global(.markdown-content p:empty) {
+:global(.markdown-content p:empty),
+:global(.markdown-content p:has(> br:only-child)) {
   display: none;
 }
 :global(.markdown-content table) { 
