@@ -48,8 +48,8 @@
   display: flex;
   align-items: flex-start;
   gap: 0.75rem;
-  font-size: 1.05rem;
-  line-height: 1.5;
+  font-size: 1.1rem;
+  line-height: 1.6;
   background: #f8fafc;
   padding: 0.75rem 1.1rem;
   border-radius: 10px;
@@ -64,8 +64,8 @@
 }
 
 .textBlock {
-  font-size: 1.1rem;
-  line-height: 1.8;
+  font-size: 1.15rem;
+  line-height: 1.85;
   color: #475569;
   white-space: pre-wrap;
 }
@@ -126,8 +126,8 @@
 }
 
 .lifeImpactText {
-  font-size: 1.05rem;
-  line-height: 1.65;
+  font-size: 1.1rem;
+  line-height: 1.7;
   color: #166534;
   font-weight: 600;
   margin: 0;
