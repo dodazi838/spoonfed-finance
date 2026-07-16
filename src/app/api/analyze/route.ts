@@ -3,7 +3,7 @@ import { GoogleAIFileManager } from '@google/generative-ai/server';
 import fs from 'fs/promises';
 import path from 'path';
 import os from 'os';
-import { PDFParse } from 'pdf-parse';
+import pdfParse from 'pdf-parse';
 
 import { createModel, genAI } from '@/lib/gemini';
 import { buildShortReportPrompt, buildLongReportPrompt } from '@/lib/prompt-builder';
@@ -40,9 +40,8 @@ export async function POST(req: NextRequest) {
     });
 
     // 3. 페이지 수 판별 (파일 삭제 전에 수행)
-    const parser = new PDFParse({ url: tempFilePath });
-    const doc = await parser.load();
-    const numPages = doc.numPages;
+    const pdfData = await pdfParse(buffer);
+    const numPages = pdfData.numpages;
     const isShortReport = numPages <= 10;
 
     // 4. 임시 파일 삭제
