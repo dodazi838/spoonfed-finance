@@ -271,10 +271,13 @@
 :global(.markdown-content li::marker) {
   color: #64748b; 
 }
+:global(.markdown-content p:empty) {
+  display: none;
+}
 :global(.markdown-content table) { 
   width: 100%; 
   border-collapse: collapse; 
-  margin: 0.6rem 0; 
+  margin: 1rem 0; 
   background-color: #ffffff; 
   border-radius: 8px; 
   overflow: hidden; 
