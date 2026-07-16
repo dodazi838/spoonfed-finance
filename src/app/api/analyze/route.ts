@@ -3,7 +3,7 @@ import { GoogleAIFileManager } from '@google/generative-ai/server';
 import fs from 'fs/promises';
 import path from 'path';
 import os from 'os';
-import pdfParse from 'pdf-parse';
+import { PDFParse } from 'pdf-parse';
 
 import { createModel, genAI } from '@/lib/gemini';
 import { buildShortReportPrompt, buildLongReportPrompt } from '@/lib/prompt-builder';
@@ -39,13 +39,14 @@ export async function POST(req: NextRequest) {
       displayName: file.name,
     });
 
-    // 3. 임시 파일 삭제
-    await fs.unlink(tempFilePath).catch(console.error);
-
-    // 4. 페이지 수 판별 → 짧은/긴 보고서 분기
-    const pdfData = await pdfParse(buffer);
-    const numPages = pdfData.numpages;
+    // 3. 페이지 수 판별 (파일 삭제 전에 수행)
+    const parser = new PDFParse(tempFilePath);
+    const pdfData = await parser.parse();
+    const numPages = pdfData.pages.length;
     const isShortReport = numPages <= 10;
+
+    // 4. 임시 파일 삭제
+    await fs.unlink(tempFilePath).catch(console.error);
 
     const model = createModel(selectedModel, isShortReport ? 16384 : 8192);
     const prompt = isShortReport
