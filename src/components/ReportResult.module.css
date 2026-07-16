@@ -217,12 +217,16 @@
   font-size: 1.1rem; 
   line-height: 1.7; 
   color: #334155; 
+  display: flex;
+  flex-direction: column;
+  gap: 0.8rem;
+}
+:global(.markdown-content > *) {
+  margin: 0 !important;
 }
 :global(.markdown-content p) { 
-  margin: 0 0 0.55rem 0;
 }
 :global(.markdown-content h3) {
-  margin: 1.2rem 0 0.4rem 0;
   font-size: 1.15rem;
   font-weight: 700;
   color: #1e293b;
@@ -232,14 +236,13 @@
 :global(.markdown-content hr) {
   border: none;
   border-top: 1px solid #f1f5f9;
-  margin: 0.5rem 0;
+  width: 100%;
 }
 :global(.markdown-content strong) { 
   font-weight: 700; 
   color: #0f172a; 
 }
 :global(.markdown-content blockquote) {
-  margin: 0.6rem 0;
   padding: 0.8rem 1rem;
   background-color: #eff6ff;
   border-left: 3px solid #2563eb;
@@ -250,7 +253,6 @@
   line-height: 1.6;
 }
 :global(.markdown-content blockquote p) {
-  margin: 0;
 }
 :global(.markdown-content mark) { 
   background-color: #fef9c3;
@@ -262,11 +264,12 @@
   -webkit-box-decoration-break: clone;
 }
 :global(.markdown-content ul), :global(.markdown-content ol) { 
-  margin: 0.3rem 0 0.5rem 0; 
   padding-left: 1.4rem; 
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
 }
 :global(.markdown-content li) { 
-  margin-bottom: 0.25rem; 
 }
 :global(.markdown-content li::marker) {
   color: #64748b; 
@@ -278,7 +281,6 @@
 :global(.markdown-content table) { 
   width: 100%; 
   border-collapse: collapse; 
-  margin: 1rem 0; 
   background-color: #ffffff; 
   border-radius: 8px; 
   overflow: hidden; 
