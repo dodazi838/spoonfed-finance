@@ -37,6 +37,7 @@ export interface ChartData {
   type?: 'bar' | 'line' | 'pie' | 'area';
   unit?: string;
   source?: string;
+  colors?: string[];
   description?: string;
   dataKeys?: string[];
   data: any[];
@@ -143,7 +144,7 @@ ${data.lifeImpact}
             />
             {keys.length > 1 && <Legend verticalAlign="top" height={36} iconType="circle" />}
             {keys.map((key, idx) => {
-              const color = COLORS[idx % COLORS.length];
+              const color = chart.colors?.[idx] || COLORS[idx % COLORS.length];
               return (
                 <Line key={key} type="monotone" dataKey={key} name={key === 'value' ? '수치' : key} stroke={color} strokeWidth={3} dot={{ r: 4, fill: color, strokeWidth: 2 }} activeDot={{ r: 6 }} isAnimationActive={false} />
               );
@@ -172,7 +173,7 @@ ${data.lifeImpact}
               isAnimationActive={false}
             >
               {chart.data.map((entry, index) => (
-                <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                <Cell key={`cell-${index}`} fill={chart.colors?.[index] || COLORS[index % COLORS.length]} />
               ))}
             </Pie>
           </PieChart>
@@ -190,7 +191,7 @@ ${data.lifeImpact}
             />
             {keys.length > 1 && <Legend verticalAlign="top" height={36} iconType="circle" />}
             {keys.map((key, idx) => {
-              const color = COLORS[idx % COLORS.length];
+              const color = chart.colors?.[idx] || COLORS[idx % COLORS.length];
               return (
                 <Area key={key} type="monotone" dataKey={key} name={key === 'value' ? '수치' : key} stroke={color} fillOpacity={0.15} fill={color} isAnimationActive={false} />
               );
@@ -211,7 +212,7 @@ ${data.lifeImpact}
             />
             {keys.length > 1 && <Legend verticalAlign="top" height={36} iconType="circle" />}
             {keys.map((key, idx) => {
-              const color = COLORS[idx % COLORS.length];
+              const color = chart.colors?.[idx] || COLORS[idx % COLORS.length];
               return (
                 <Bar key={key} dataKey={key} name={key === 'value' ? '수치' : key} fill={color} radius={[4, 4, 0, 0]} barSize={keys.length > 1 ? 25 : 45} isAnimationActive={false} minPointSize={3}>
                   {keys.length === 1 && <LabelList dataKey={key} position="top" fill="#475569" fontSize={12} fontWeight={600} />}
