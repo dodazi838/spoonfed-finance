@@ -136,11 +136,12 @@ a {
   background: #eff6ff;
   border: 1px solid #bfdbfe;
   border-radius: 12px;
-  padding: 1.25rem;
+  padding: 1.25rem 1.5rem;
   font-size: 1.1rem;
   font-weight: 600;
   color: #1e293b;
-  line-height: 1.6;
+  line-height: 1.7;
+  margin-bottom: 1.25rem;
 }
 .markdown-content mark {
   background-color: #fef9c3;
