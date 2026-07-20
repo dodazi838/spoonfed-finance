@@ -51,7 +51,10 @@ export function parseAIResponse(responseText: string): { success: true; data: an
         success: true,
         data: {
           title: titleMatch ? unescape(titleMatch[1]) : "분석 내용",
-          easyExplanation: easyExplanationMatch ? unescape(easyExplanationMatch[1]) : responseText,
+          // 끝에 미완성된 표(| 항목 | 내용 등)가 남아있다면 제거
+          easyExplanation: (easyExplanationMatch ? unescape(easyExplanationMatch[1]) : responseText)
+            .replace(/\|\s*항목\s*\|\s*내용\s*\|?[\s\S]*$/, '')
+            .trim(),
           charts: []
         }
       };

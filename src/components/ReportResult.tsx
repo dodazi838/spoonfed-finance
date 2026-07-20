@@ -36,6 +36,7 @@ export interface ChartData {
   validation_thought?: string;
   type?: 'bar' | 'line' | 'pie' | 'area';
   unit?: string;
+  source?: string;
   description?: string;
   dataKeys?: string[];
   data: any[];
@@ -89,7 +90,8 @@ ${chart.data.map(d => {
   return `- ${d.name}: ${values}`;
 }).join('\n')}
 
-> 💡 **해설**: ${chart.description || '본문 참조'}
+> 💡 ${chart.description || '본문 참조'}
+> *출처: ${chart.source || '원본 보고서'}*
   `;
 }).join('\n') : ''}
 ---
@@ -284,7 +286,12 @@ ${data.lifeImpact}
                         
                         {chart.description && (
                           <div className={styles.chartDescription}>
-                            <strong>💡 해설:</strong> {chart.description}
+                            <p style={{ margin: 0, marginBottom: chart.source ? '0.5rem' : 0 }}>💡 {chart.description}</p>
+                            {chart.source && (
+                              <p style={{ margin: 0, fontSize: '0.9rem', color: '#64748b', textAlign: 'right' }}>
+                                출처: {chart.source}
+                              </p>
+                            )}
                           </div>
                         )}
                       </div>
