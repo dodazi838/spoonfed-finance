@@ -17,6 +17,19 @@ import styles from './ReportResult.module.css';
 // Corporate Light Theme Colors (e.g., Deep Blue, Teal, Amber, Navy, Purple, Rose)
 const COLORS = ['#2563eb', '#0f766e', '#f59e0b', '#0369a1', '#6d28d9', '#be123c'];
 
+// Fix markdown tables that AI outputs on a single line (e.g. "|A|B| |C|D|")
+// by splitting them into proper multi-line format for remarkGfm to parse.
+function fixMarkdownTables(text: string): string {
+  // Pattern: a pipe at end of a cell row, whitespace, then pipe starting next row
+  // e.g. "...내용입니다| |주요 투자..." → "...내용입니다|\n|주요 투자..."
+  let fixed = text.replace(/\|\s{1,3}\|/g, '|\n|');
+  
+  // Ensure there's a blank line before a table starts (required by GFM)
+  fixed = fixed.replace(/([^\n])\n(\|[^\n]+\|)\n(\|[\s:|-]+\|)/g, '$1\n\n$2\n$3');
+  
+  return fixed;
+}
+
 export interface ChartData {
   title: string;
   validation_thought?: string;
@@ -233,7 +246,7 @@ ${data.lifeImpact}
                     remarkPlugins={[remarkGfm]} 
                     rehypePlugins={[rehypeRaw]}
                   >
-                    {section.easyExplanation || ''}
+                    {fixMarkdownTables(section.easyExplanation || '')}
                   </ReactMarkdown>
                 </div>
 
