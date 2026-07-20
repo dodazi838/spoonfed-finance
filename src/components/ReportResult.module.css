@@ -108,11 +108,11 @@
 
 .chartDescription {
   margin-top: 1rem;
-  padding: 0.9rem 1rem;
+  padding: 1rem 1.25rem;
   background: #f8fafc;
   border-radius: 10px;
-  font-size: 0.95rem;
-  line-height: 1.55;
+  font-size: 1.08rem;
+  line-height: 1.7;
   color: #475569;
   border-left: 3px solid #cbd5e1;
 }

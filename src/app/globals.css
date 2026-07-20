@@ -142,6 +142,8 @@ a {
   color: #1e293b;
   line-height: 1.7;
   margin-bottom: 1.25rem;
+  width: 100%;
+  box-sizing: border-box;
 }
 .markdown-content mark {
   background-color: #fef9c3;
