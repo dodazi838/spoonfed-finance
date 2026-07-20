@@ -12,6 +12,7 @@ import { useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeRaw from 'rehype-raw';
+import { marked } from 'marked';
 import styles from './ReportResult.module.css';
 
 // Corporate Light Theme Colors (e.g., Deep Blue, Teal, Amber, Navy, Purple, Rose)
@@ -67,8 +68,8 @@ export interface ReportData {
 export default function ReportResult({ data }: { data: ReportData }) {
   const [copied, setCopied] = useState(false);
 
-  const handleCopyBlog = () => {
-    const markdown = `
+  const handleCopyBlog = async () => {
+    const markdownText = `
 # 📌 보고서 핵심 한눈에 보기
 
 ## 📝 보고서 핵심 요약
@@ -77,7 +78,7 @@ ${data.summary?.map(s => `- ${s}`).join('\n')}
 ---
 ${data.sections?.map(section => `
 ## 📖 ${section.title}
-${section.easyExplanation}
+${fixMarkdownTables(section.easyExplanation || '')}
 
 ${section.charts?.length > 0 ? section.charts.map(chart => {
   const keys = chart.dataKeys || ['value'];
@@ -98,7 +99,22 @@ ${chart.data.map(d => {
 ${data.lifeImpact}
     `.trim();
 
-    navigator.clipboard.writeText(markdown);
+    try {
+      // 마크다운을 HTML로 변환 (네이버 블로그 붙여넣기 지원용)
+      const htmlText = await marked.parse(markdownText);
+      
+      // Clipboard API를 사용하여 HTML과 Text를 동시에 클립보드에 복사
+      const clipboardItem = new ClipboardItem({
+        'text/plain': new Blob([markdownText], { type: 'text/plain' }),
+        'text/html': new Blob([htmlText], { type: 'text/html' }),
+      });
+      await navigator.clipboard.write([clipboardItem]);
+    } catch (err) {
+      console.warn("Clipboard API failed, falling back to plain text", err);
+      // Fallback
+      await navigator.clipboard.writeText(markdownText);
+    }
+
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };

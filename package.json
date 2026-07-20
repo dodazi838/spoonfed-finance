@@ -11,6 +11,7 @@
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
     "lucide-react": "^1.23.0",
+    "marked": "^18.0.6",
     "next": "16.2.10",
     "pdf-parse": "^1.1.1",
     "react": "19.2.4",
@@ -21,6 +22,7 @@
     "remark-gfm": "^4.0.1"
   },
   "devDependencies": {
+    "@types/marked": "^5.0.2",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
