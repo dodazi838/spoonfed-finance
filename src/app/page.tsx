@@ -244,21 +244,32 @@ export default function Home() {
   // ─── 렌더링 ───
   const isShort = checkIsShortReport(tocData);
   const chapterLimit = isShort ? 999 : 3;
+  
+  // 게이지 바 복구: 사용자 요청에 따라 일일 한도(2M) 가시화
+  const MAX_DAILY_TOKENS = 2000000; // 2M
+  const tokenPercent = Math.min((dailyTokens / MAX_DAILY_TOKENS) * 100, 100);
   const tokenFormatted = (dailyTokens / 1000).toFixed(1) + 'k';
+  const tokenColor = dailyTokens > (MAX_DAILY_TOKENS * 0.8) ? '#ef4444' : dailyTokens > (MAX_DAILY_TOKENS * 0.5) ? '#f59e0b' : '#2563eb';
 
   return (
     <main className={styles.container}>
       
       {/* 글로벌 토큰 위젯 */}
       {isClient && (
-        <div className={styles.tokenWidget} title="API 할당량 초과 에러(429) 발생 시, 분당 요청 횟수(RPM) 제한에 걸린 것이므로 1분 후 다시 시도해주세요.">
+        <div className={styles.tokenWidget} title="API 할당량 초과 에러(429) 발생 시, 분당 요청 횟수(RPM) 또는 분당 토큰(TPM) 한도에 도달한 것이므로 1~2분 후 다시 시도해주세요.">
           <div className={styles.tokenWidgetHeader}>
-            <span className={styles.tokenWidgetLabel}>오늘 누적 토큰 사용량</span>
+            <span className={styles.tokenWidgetLabel}>일일 무료 테스트 한도 (2M)</span>
             <span className={styles.tokenWidgetValue}>
-              <strong className={styles.tokenWidgetValueStrong}>{tokenFormatted}</strong> Tokens
+              <strong className={styles.tokenWidgetValueStrong}>{tokenFormatted}</strong> / 2,000k
             </span>
           </div>
-          {/* 프로그레스 바(게이지) 삭제: Gemini Free Tier는 일일 한도가 아니라 분당 한도(RPM)가 중요하므로 오해 방지 */}
+          <div className={styles.tokenWidgetTrack}>
+            <div style={{ 
+              width: `${tokenPercent}%`, height: '100%', 
+              backgroundColor: tokenColor,
+              transition: 'width 0.5s ease-out, background-color 0.5s'
+            }} />
+          </div>
         </div>
       )}
 
