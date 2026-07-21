@@ -1,6 +1,6 @@
 'use client';
 
-import { Check, Copy, CheckCircle2, TrendingUp, BookOpen, FileText, Download, Loader2 } from 'lucide-react';
+import { Check, Copy, CheckCircle2, TrendingUp, BookOpen, FileText, Download, Loader2, Camera } from 'lucide-react';
 import { 
   BarChart, Bar, 
   LineChart, Line, 
@@ -13,6 +13,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeRaw from 'rehype-raw';
 import { marked } from 'marked';
+import html2canvas from 'html2canvas';
 import styles from './ReportResult.module.css';
 
 // Corporate Light Theme Colors (e.g., Deep Blue, Teal, Amber, Navy, Purple, Rose)
@@ -131,6 +132,44 @@ ${data.lifeImpact}
 
   const handlePrintPdf = () => {
     window.print();
+  };
+
+  const [capturingChartId, setCapturingChartId] = useState<string | null>(null);
+
+  const handleCaptureChart = async (elementId: string) => {
+    setCapturingChartId(elementId);
+    try {
+      const element = document.getElementById(elementId);
+      if (!element) return;
+      
+      const canvas = await html2canvas(element, {
+        scale: 2, // 고해상도
+        backgroundColor: '#ffffff',
+      });
+      
+      canvas.toBlob(async (blob) => {
+        if (blob) {
+          try {
+            const item = new ClipboardItem({ 'image/png': blob });
+            await navigator.clipboard.write([item]);
+            alert('차트 이미지가 클립보드에 복사되었습니다! (Ctrl+V로 붙여넣기 가능)');
+          } catch (e) {
+            // Safari 등 일부 브라우저 호환성 문제 시 다운로드로 대체
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `chart-${elementId}.png`;
+            link.click();
+            URL.revokeObjectURL(url);
+          }
+        }
+      }, 'image/png');
+    } catch (err) {
+      console.error(err);
+      alert('차트 캡처 중 오류가 발생했습니다.');
+    } finally {
+      setCapturingChartId(null);
+    }
   };
 
   const renderChart = (chart: ChartData) => {
@@ -280,10 +319,21 @@ ${data.lifeImpact}
                 {section.charts && section.charts.length > 0 && (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginTop: '1rem' }}>
                     {section.charts.map((chart, chartIdx) => (
-                      <div key={chartIdx} className={styles.chartCard}>
-                        <div className={styles.chartHeader}>
-                          <h3 className={styles.chartTitle}>{chart.title}</h3>
-                          {chart.unit && <span className={styles.chartUnit}>단위: {chart.unit}</span>}
+                      <div key={chartIdx} className={styles.chartCard} id={`chart-${idx}-${chartIdx}`}>
+                        <div className={styles.chartHeader} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                          <div>
+                            <h3 className={styles.chartTitle}>{chart.title}</h3>
+                            {chart.unit && <span className={styles.chartUnit}>단위: {chart.unit}</span>}
+                          </div>
+                          <button 
+                            onClick={() => handleCaptureChart(`chart-${idx}-${chartIdx}`)}
+                            className={styles.copyButton}
+                            style={{ padding: '0.4rem 0.75rem', fontSize: '0.85rem', alignSelf: 'flex-start', flexShrink: 0 }}
+                            title="차트를 이미지로 복사합니다"
+                          >
+                            {capturingChartId === `chart-${idx}-${chartIdx}` ? <Loader2 className="animate-spin" size={16} /> : <Camera size={16} />}
+                            <span style={{ marginLeft: '4px' }}>캡처</span>
+                          </button>
                         </div>
                         
                         <div className={styles.chartContainer}>
