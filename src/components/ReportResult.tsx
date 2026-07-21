@@ -20,7 +20,14 @@ const COLORS = ['#2563eb', '#0f766e', '#f59e0b', '#0369a1', '#6d28d9', '#be123c'
 
 // Fix markdown tables that AI outputs on a single line (e.g. "|A|B| |C|D|")
 // by splitting them into proper multi-line format for remarkGfm to parse.
-function fixMarkdownTables(text: string): string {
+function fixMarkdownTables(text: any): string {
+  if (!text) return '';
+  if (Array.isArray(text)) {
+    text = text.join('\n');
+  } else if (typeof text !== 'string') {
+    text = String(text);
+  }
+
   // Pattern: a pipe at end of a cell row, whitespace, then pipe starting next row
   // e.g. "...내용입니다| |주요 투자..." → "...내용입니다|\n|주요 투자..."
   let fixed = text.replace(/\|\s{1,3}\|/g, '|\n|');
