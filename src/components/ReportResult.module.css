@@ -140,6 +140,10 @@
   margin-bottom: 0;
 }
 
+.chartDescription p {
+  margin: 0;
+}
+
 .actionContainer {
   display: flex;
   justify-content: center;

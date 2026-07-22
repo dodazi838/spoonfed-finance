@@ -344,7 +344,11 @@ ${data.implications}
                         
                         {chart.description && (
                           <div className={styles.chartDescription}>
-                            <p style={{ margin: 0, marginBottom: chart.source ? '0.5rem' : 0 }}>💡 {chart.description}</p>
+                            <div className="markdown-content" style={{ margin: 0, marginBottom: chart.source ? '0.5rem' : 0 }}>
+                              <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw]}>
+                                {`💡 ` + chart.description}
+                              </ReactMarkdown>
+                            </div>
                             {chart.source && (
                               <p style={{ margin: 0, fontSize: '0.9rem', color: '#64748b', textAlign: 'right' }}>
                                 출처: {chart.source}
