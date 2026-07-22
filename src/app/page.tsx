@@ -11,7 +11,7 @@ type Step = 'upload' | 'select' | 'analyze';
 interface TocData {
   summary: string[];
   chapters: string[];
-  lifeImpact: string;
+  implications: string;
   isShortReport: boolean | string;
   sections?: any[];
   fileUri: string;
@@ -129,7 +129,7 @@ export default function Home() {
       if (data.isShortReport === true || data.isShortReport === 'true') {
         const initialData: ReportData = {
           summary: data.summary || [],
-          lifeImpact: data.lifeImpact || '',
+          implications: data.implications || '',
           sections: data.sections || [],
           usage: data.usage
         };
@@ -177,7 +177,7 @@ export default function Home() {
 
     const initialData: ReportData = {
       summary: tocData?.summary || [],
-      lifeImpact: tocData?.lifeImpact || '',
+      implications: tocData?.implications || '',
       sections: initialSections,
       fileUri: tocData?.fileUri,
       mimeType: tocData?.mimeType,
@@ -352,8 +352,8 @@ export default function Home() {
                   <li key={idx}>{item}</li>
                 ))}
               </ul>
-              <h3 className={styles.summaryTitle} style={{ marginTop: '1.5rem' }}>💡 생활 영향</h3>
-              <p style={{ color: '#cbd5e1', lineHeight: '1.7' }}>{tocData.lifeImpact}</p>
+              <h3 className={styles.summaryTitle} style={{ marginTop: '1.5rem' }}>💡 시사점 및 전망</h3>
+              <p style={{ color: '#cbd5e1', lineHeight: '1.7' }}>{tocData.implications}</p>
             </div>
 
             <div className={styles.chapterBox}>

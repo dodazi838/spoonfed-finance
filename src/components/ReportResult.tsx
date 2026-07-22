@@ -69,7 +69,7 @@ export interface ReportData {
   summary: string[];
   chapters?: string[];
   sections: SectionAnalysis[];
-  lifeImpact: string;
+  implications: string;
   fileUri?: string;
   mimeType?: string;
   usage?: TokenUsage; // Usage from the initial analyze request
@@ -106,8 +106,8 @@ ${chart.data.map(d => {
 ---
 `).join('\n') || ''}
 
-## 💡 그래서 내 생활에는 어떤 영향이 있나?
-${data.lifeImpact}
+## 💡 핵심 시사점 및 전망
+${data.implications}
     `.trim();
 
     try {
@@ -362,15 +362,15 @@ ${data.lifeImpact}
         </div>
       ))}
 
-      {/* 생활 영향 */}
+      {/* 시사점 */}
       <section className={styles.section}>
         <div className={styles.sectionHeader}>
           <FileText className={styles.icon} size={28} />
-          <h2 className={styles.sectionTitle}>그래서 내 생활에는 어떤 영향이 있나?</h2>
+          <h2 className={styles.sectionTitle}>핵심 시사점 및 전망</h2>
         </div>
         <div className={styles.lifeImpactBox}>
           <p className={styles.lifeImpactText}>
-            💡 {data.lifeImpact}
+            💡 {data.implications}
           </p>
         </div>
       </section>
