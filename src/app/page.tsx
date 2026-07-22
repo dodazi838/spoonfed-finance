@@ -353,7 +353,7 @@ export default function Home() {
                 ))}
               </ul>
               <h3 className={styles.summaryTitle} style={{ marginTop: '1.5rem' }}>💡 시사점 및 전망</h3>
-              <p style={{ color: '#cbd5e1', lineHeight: '1.7' }}>{tocData.implications}</p>
+              <p style={{ color: '#cbd5e1', lineHeight: '1.7', whiteSpace: 'pre-wrap' }}>{tocData.implications}</p>
             </div>
 
             <div className={styles.chapterBox}>

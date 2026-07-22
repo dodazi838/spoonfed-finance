@@ -125,11 +125,19 @@
 }
 
 .lifeImpactText {
-  font-size: 1.1rem;
-  line-height: 1.7;
+  font-size: 1.05rem;
+  line-height: 1.8;
   color: #166534;
-  font-weight: 600;
+  font-weight: 500;
   margin: 0;
+}
+
+.lifeImpactText p {
+  margin-bottom: 0.8rem;
+}
+
+.lifeImpactText p:last-child {
+  margin-bottom: 0;
 }
 
 .actionContainer {

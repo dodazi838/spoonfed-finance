@@ -369,9 +369,14 @@ ${data.implications}
           <h2 className={styles.sectionTitle}>핵심 시사점 및 전망</h2>
         </div>
         <div className={styles.lifeImpactBox}>
-          <p className={styles.lifeImpactText}>
-            💡 {data.implications}
-          </p>
+          <div className={`${styles.lifeImpactText} markdown-content`}>
+            <ReactMarkdown 
+              remarkPlugins={[remarkGfm]} 
+              rehypePlugins={[rehypeRaw]}
+            >
+              {`💡 ` + data.implications}
+            </ReactMarkdown>
+          </div>
         </div>
       </section>
 
