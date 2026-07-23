@@ -34,7 +34,7 @@ export default function Home() {
   const [tocData, setTocData] = useState<TocData | null>(null);
   const [selectedChapters, setSelectedChapters] = useState<string[]>([]);
   const [reportData, setReportData] = useState<ReportData | null>(null);
-  const [selectedModel] = useState<string>('gemini-2.5-flash');
+  const [selectedModel] = useState<string>('gemini-3.5-flash');
   const [dailyTokens, setDailyTokens] = useState<number>(0);
   const [isClient, setIsClient] = useState(false);
 
@@ -290,7 +290,7 @@ export default function Home() {
           
           <div className={styles.modelBadgeContainer}>
             <div className={styles.modelBadge}>
-              <strong className={styles.modelBadgeName}>Gemini 2.5 Flash</strong>
+              <strong className={styles.modelBadgeName}>Gemini 3.5 Flash</strong>
               <span className={styles.modelBadgeDesc}>최신 AI 모델 적용 중</span>
             </div>
           </div>

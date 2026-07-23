@@ -16,7 +16,7 @@ export async function POST(req: NextRequest) {
   try {
     const formData = await req.formData();
     const file = formData.get('file') as File;
-    const selectedModel = formData.get('modelName') as string || 'gemini-2.5-flash';
+    const selectedModel = formData.get('modelName') as string || 'gemini-3.5-flash';
 
     if (!file) {
       return NextResponse.json({ error: 'No file provided' }, { status: 400 });
