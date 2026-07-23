@@ -51,10 +51,8 @@ export function parseAIResponse(responseText: string): { success: true; data: an
         success: true,
         data: {
           title: titleMatch ? unescape(titleMatch[1]) : "분석 내용",
-          // 끝에 미완성된 표(| 항목 | ...)가 남아있다면 제거 (파싱 실패한 응답이므로 끝에 있는 표는 100% 잘린 표임)
-          easyExplanation: (easyExplanationMatch ? unescape(easyExplanationMatch[1]) : responseText)
-            .replace(/\|\s*항목\s*\|[\s\S]*$/, '')
-            .trim(),
+          // 끝에 미완성된 표를 억지로 지우는 정규식 제거 (오히려 정상적인 표까지 모두 날려버리는 부작용 발생)
+          easyExplanation: (easyExplanationMatch ? unescape(easyExplanationMatch[1]) : responseText).trim(),
           charts: []
         }
       };

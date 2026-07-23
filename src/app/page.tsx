@@ -243,7 +243,7 @@ export default function Home() {
 
   // ─── 렌더링 ───
   const isShort = checkIsShortReport(tocData);
-  const chapterLimit = isShort ? 999 : 3;
+  const chapterLimit = isShort ? 999 : 4;
   
   // 게이지 바 복구: 사용자 요청에 따라 일일 한도(2M) 가시화
   const MAX_DAILY_TOKENS = 2000000; // 2M
@@ -360,13 +360,13 @@ export default function Home() {
               <div className={styles.chapterHeader}>
                 <h3 className={styles.chapterTitle}>📖 상세 분석할 챕터 선택</h3>
                 <span className={`${styles.chapterBadge} ${selectedChapters.length === chapterLimit ? styles.chapterBadgeWarning : styles.chapterBadgeActive}`}>
-                  {selectedChapters.length} {isShort ? '선택됨' : '/ 3 선택됨'}
+                  {selectedChapters.length} {isShort ? '선택됨' : '/ 4 선택됨'}
                 </span>
               </div>
               <p className={styles.chapterDesc}>
                 {isShort
                   ? "분량이 짧은 보고서이므로 제한 없이 모든 챕터를 선택하여 상세 분석할 수 있습니다." 
-                  : "가장 관심 있는 핵심 챕터를 최대 3개까지만 골라주세요. AI가 선택된 챕터에 한해 심층 분석과 차트를 추출합니다."}
+                  : "가장 관심 있는 핵심 챕터를 최대 4개까지만 골라주세요. AI가 선택된 챕터에 한해 심층 분석과 차트를 추출합니다."}
               </p>
               
               {isShort && (
