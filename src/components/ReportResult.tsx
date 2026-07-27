@@ -330,6 +330,7 @@ ${data.implications}
                             className={styles.copyButton}
                             style={{ padding: '0.4rem 0.75rem', fontSize: '0.85rem', alignSelf: 'flex-start', flexShrink: 0 }}
                             title="차트를 이미지로 복사합니다"
+                            data-html2canvas-ignore="true"
                           >
                             {capturingChartId === `chart-${idx}-${chartIdx}` ? <Loader2 className="animate-spin" size={16} /> : <Camera size={16} />}
                             <span style={{ marginLeft: '4px' }}>캡처</span>
