@@ -77,57 +77,80 @@ export interface ReportData {
 
 export default function ReportResult({ data }: { data: ReportData }) {
   const [copied, setCopied] = useState(false);
+  const [isCopying, setIsCopying] = useState(false);
 
   const handleCopyBlog = async () => {
-    const markdownText = `
-# 📌 보고서 핵심 한눈에 보기
+    setIsCopying(true);
+    try {
+      // 1. 차트 이미지 Base64 캡처 수집
+      const chartImages: { [key: string]: string } = {};
+      
+      if (data.sections) {
+        for (let sIdx = 0; sIdx < data.sections.length; sIdx++) {
+          const section = data.sections[sIdx];
+          if (section.charts) {
+            for (let cIdx = 0; cIdx < section.charts.length; cIdx++) {
+              const chartId = `chart-${sIdx}-${cIdx}`;
+              const element = document.getElementById(chartId);
+              if (element) {
+                // html2canvas 실행 (복사 버튼은 data-html2canvas-ignore 덕분에 제외됨)
+                const canvas = await html2canvas(element, { scale: 2, backgroundColor: '#ffffff' });
+                chartImages[chartId] = canvas.toDataURL('image/png');
+              }
+            }
+          }
+        }
+      }
 
-## 📝 보고서 핵심 요약
+      // 2. 마크다운 생성 (타이틀 아이콘 제외, 차트는 텍스트 대신 이미지 문법으로 대체)
+      const markdownText = `
+# 보고서 핵심 한눈에 보기
+
+## 보고서 핵심 요약
 ${data.summary?.map(s => `- ${s}`).join('\n')}
 
 ---
-${data.sections?.map(section => `
-## 📖 ${section.title}
+${data.sections?.map((section, sIdx) => `
+## ${section.title}
 ${fixMarkdownTables(section.easyExplanation || '')}
 
-${section.charts?.length > 0 ? section.charts.map(chart => {
-  const keys = chart.dataKeys || ['value'];
-  return `
-### 📊 ${chart.title} ${chart.unit ? `(단위: ${chart.unit})` : ''}
-${chart.data.map(d => {
-  const values = keys.map(k => `${k}: ${d[k]}`).join(', ');
-  return `- ${d.name}: ${values}`;
-}).join('\n')}
-
-> 💡 ${chart.description || '본문 참조'}
-> *출처: ${chart.source || '원본 보고서'}*
-  `;
+${section.charts?.length > 0 ? section.charts.map((chart, cIdx) => {
+  const chartId = `chart-${sIdx}-${cIdx}`;
+  const base64Img = chartImages[chartId];
+  // 텍스트 테이블 대신, 캡처된 Base64 이미지를 마크다운 문법으로 바로 삽입
+  return base64Img ? `\n![${chart.title}](${base64Img})\n` : '';
 }).join('\n') : ''}
 ---
 `).join('\n') || ''}
 
-## 💡 핵심 시사점 및 전망
+## 핵심 시사점 및 전망
 ${data.implications}
-    `.trim();
+      `.trim();
 
-    try {
-      // 마크다운을 HTML로 변환 (네이버 블로그 붙여넣기 지원용)
-      const htmlText = await marked.parse(markdownText);
+      // 3. HTML 파싱 및 인라인 스타일 강제 주입 (네이버 블로그 최적화)
+      let htmlText = await marked.parse(markdownText);
       
-      // Clipboard API를 사용하여 HTML과 Text를 동시에 클립보드에 복사
+      // 본문 글씨(p, li) 16px, 줄간격 190% 적용
+      htmlText = htmlText.replace(/<p>/g, '<p style="font-size: 16px; line-height: 190%;">');
+      htmlText = htmlText.replace(/<li>/g, '<li style="font-size: 16px; line-height: 190%;">');
+      // 볼드체(strong) 색상을 파란색(#0078cb)으로 변경
+      htmlText = htmlText.replace(/<strong>/g, '<strong style="color: #0078cb;">');
+
+      // 4. 클립보드에 HTML(Rich Text) 포맷으로 쓰기
       const clipboardItem = new ClipboardItem({
         'text/plain': new Blob([markdownText], { type: 'text/plain' }),
         'text/html': new Blob([htmlText], { type: 'text/html' }),
       });
       await navigator.clipboard.write([clipboardItem]);
+      
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
     } catch (err) {
-      console.warn("Clipboard API failed, falling back to plain text", err);
-      // Fallback
-      await navigator.clipboard.writeText(markdownText);
+      console.error("Clipboard API failed", err);
+      alert('블로그 복사 중 오류가 발생했습니다.');
+    } finally {
+      setIsCopying(false);
     }
-
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
   };
 
   const handlePrintPdf = () => {
@@ -387,9 +410,9 @@ ${data.implications}
 
       {/* 블로그 복사 및 PDF 저장 */}
       <div className={styles.actionContainer}>
-        <button onClick={handleCopyBlog} className={styles.copyButton}>
-          {copied ? <Check size={20} /> : <Copy size={20} />}
-          {copied ? '복사 완료!' : '블로그 양식 복사 (MD)'}
+        <button onClick={handleCopyBlog} className={styles.copyButton} disabled={isCopying}>
+          {isCopying ? <Loader2 size={20} className="animate-spin" /> : (copied ? <Check size={20} /> : <Copy size={20} />)}
+          {isCopying ? '복사 중 (차트 변환)...' : (copied ? '복사 완료!' : '블로그 양식 복사 (MD)')}
         </button>
         <button onClick={handlePrintPdf} className={styles.pdfButton}>
           <Download size={20} />
