@@ -82,27 +82,7 @@ export default function ReportResult({ data }: { data: ReportData }) {
   const handleCopyBlog = async () => {
     setIsCopying(true);
     try {
-      // 1. 차트 이미지 Base64 캡처 수집
-      const chartImages: { [key: string]: string } = {};
-      
-      if (data.sections) {
-        for (let sIdx = 0; sIdx < data.sections.length; sIdx++) {
-          const section = data.sections[sIdx];
-          if (section.charts) {
-            for (let cIdx = 0; cIdx < section.charts.length; cIdx++) {
-              const chartId = `chart-${sIdx}-${cIdx}`;
-              const element = document.getElementById(chartId);
-              if (element) {
-                // html2canvas 실행 (복사 버튼은 data-html2canvas-ignore 덕분에 제외됨)
-                const canvas = await html2canvas(element, { scale: 2, backgroundColor: '#ffffff' });
-                chartImages[chartId] = canvas.toDataURL('image/png');
-              }
-            }
-          }
-        }
-      }
-
-      // 2. 마크다운 생성 (타이틀 아이콘 제외, 차트는 텍스트 대신 이미지 문법으로 대체)
+      // 2. 마크다운 생성 (타이틀 아이콘 제외)
       const markdownText = `
 # 보고서 핵심 한눈에 보기
 
@@ -115,10 +95,9 @@ ${data.sections?.map((section, sIdx) => `
 ${fixMarkdownTables(section.easyExplanation || '')}
 
 ${section.charts?.length > 0 ? section.charts.map((chart, cIdx) => {
-  const chartId = `chart-${sIdx}-${cIdx}`;
-  const base64Img = chartImages[chartId];
-  // 텍스트 테이블 대신, 캡처된 Base64 이미지를 마크다운 문법으로 바로 삽입
-  return base64Img ? `\n![${chart.title}](${base64Img})\n` : '';
+  // 네이버 블로그 보안 정책상 클립보드를 통한 Base64 이미지 자동 삽입이 차단되므로,
+  // 사용자가 직접 캡처 버튼을 눌러 붙여넣기 할 수 있도록 안내 문구를 삽입합니다.
+  return `\n\n> 🖼️ **[여기에 '${chart.title}' 차트를 캡처해서 붙여넣으세요]**\n\n`;
 }).join('\n') : ''}
 ---
 `).join('\n') || ''}
@@ -127,14 +106,48 @@ ${section.charts?.length > 0 ? section.charts.map((chart, cIdx) => {
 ${data.implications}
       `.trim();
 
-      // 3. HTML 파싱 및 인라인 스타일 강제 주입 (네이버 블로그 최적화)
+      // 3. HTML 파싱
       let htmlText = await marked.parse(markdownText);
       
-      // 본문 글씨(p, li) 16px, 줄간격 190% 적용
-      htmlText = htmlText.replace(/<p>/g, '<p style="font-size: 16px; line-height: 190%;">');
-      htmlText = htmlText.replace(/<li>/g, '<li style="font-size: 16px; line-height: 190%;">');
-      // 볼드체(strong) 색상을 파란색(#0078cb)으로 변경
-      htmlText = htmlText.replace(/<strong>/g, '<strong style="color: #0078cb;">');
+      // DOMParser를 이용해 안전하게 인라인 스타일 주입
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(htmlText, 'text/html');
+
+      // (1) 본문 글씨 16px, 줄간격 190%
+      doc.querySelectorAll('p, li, blockquote').forEach((el: any) => {
+        el.style.fontSize = '16px';
+        el.style.lineHeight = '190%';
+      });
+
+      // (2) 모든 볼드체 파란색(#0078cb)
+      doc.querySelectorAll('strong').forEach((el: any) => {
+        el.style.color = '#0078cb';
+      });
+
+      // (3) 표(Table) 스타일링 (테두리, 헤더 배경 #e6eeff) 및 표 내부 볼드체 색상 원복
+      doc.querySelectorAll('table').forEach((table: any) => {
+        table.style.borderCollapse = 'collapse';
+        table.style.width = '100%';
+        table.style.border = '2px solid #e6eeff';
+        
+        // 표 안의 볼드체는 다시 검은색으로
+        table.querySelectorAll('strong').forEach((el: any) => {
+          el.style.color = '#000000';
+        });
+      });
+      
+      doc.querySelectorAll('th').forEach((th: any) => {
+        th.style.backgroundColor = '#e6eeff';
+        th.style.border = '1px solid #e6eeff';
+        th.style.padding = '10px';
+      });
+      
+      doc.querySelectorAll('td').forEach((td: any) => {
+        td.style.border = '1px solid #e6eeff';
+        td.style.padding = '10px';
+      });
+
+      htmlText = doc.body.innerHTML;
 
       // 4. 클립보드에 HTML(Rich Text) 포맷으로 쓰기
       const clipboardItem = new ClipboardItem({
