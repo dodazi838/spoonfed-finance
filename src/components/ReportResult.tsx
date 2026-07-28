@@ -78,11 +78,50 @@ export interface ReportData {
 export default function ReportResult({ data }: { data: ReportData }) {
   const [copied, setCopied] = useState(false);
   const [isCopying, setIsCopying] = useState(false);
+  const [copiedSectionId, setCopiedSectionId] = useState<number | null>(null);
+
+  const copyMarkdownToNaverBlog = async (markdownText: string) => {
+    let htmlText = await marked.parse(markdownText);
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(htmlText, 'text/html');
+
+    doc.querySelectorAll('p, li, blockquote').forEach((el: any) => {
+      el.style.fontSize = '16px';
+      el.style.lineHeight = '190%';
+    });
+    doc.querySelectorAll('strong').forEach((el: any) => {
+      el.style.color = '#0078cb';
+    });
+    doc.querySelectorAll('table').forEach((table: any) => {
+      table.style.borderCollapse = 'collapse';
+      table.style.width = '100%';
+      table.style.border = '2px solid #e6eeff';
+      table.querySelectorAll('strong').forEach((el: any) => {
+        el.style.color = '#000000';
+      });
+    });
+    doc.querySelectorAll('th').forEach((th: any) => {
+      th.style.backgroundColor = '#e6eeff';
+      th.style.border = '1px solid #e6eeff';
+      th.style.padding = '10px';
+    });
+    doc.querySelectorAll('td').forEach((td: any) => {
+      td.style.border = '1px solid #e6eeff';
+      td.style.padding = '10px';
+    });
+
+    htmlText = doc.body.innerHTML;
+
+    const clipboardItem = new ClipboardItem({
+      'text/plain': new Blob([markdownText], { type: 'text/plain' }),
+      'text/html': new Blob([htmlText], { type: 'text/html' }),
+    });
+    await navigator.clipboard.write([clipboardItem]);
+  };
 
   const handleCopyBlog = async () => {
     setIsCopying(true);
     try {
-      // 2. 마크다운 생성 (타이틀 아이콘 제외)
       const markdownText = `
 # 보고서 핵심 한눈에 보기
 
@@ -95,8 +134,6 @@ ${data.sections?.map((section, sIdx) => `
 ${fixMarkdownTables(section.easyExplanation || '')}
 
 ${section.charts?.length > 0 ? section.charts.map((chart, cIdx) => {
-  // 네이버 블로그 보안 정책상 클립보드를 통한 Base64 이미지 자동 삽입이 차단되므로,
-  // 사용자가 직접 캡처 버튼을 눌러 붙여넣기 할 수 있도록 안내 문구를 삽입합니다.
   return `\n\n> 🖼️ **[여기에 '${chart.title}' 차트를 캡처해서 붙여넣으세요]**\n\n`;
 }).join('\n') : ''}
 ---
@@ -106,55 +143,7 @@ ${section.charts?.length > 0 ? section.charts.map((chart, cIdx) => {
 ${data.implications}
       `.trim();
 
-      // 3. HTML 파싱
-      let htmlText = await marked.parse(markdownText);
-      
-      // DOMParser를 이용해 안전하게 인라인 스타일 주입
-      const parser = new DOMParser();
-      const doc = parser.parseFromString(htmlText, 'text/html');
-
-      // (1) 본문 글씨 16px, 줄간격 190%
-      doc.querySelectorAll('p, li, blockquote').forEach((el: any) => {
-        el.style.fontSize = '16px';
-        el.style.lineHeight = '190%';
-      });
-
-      // (2) 모든 볼드체 파란색(#0078cb)
-      doc.querySelectorAll('strong').forEach((el: any) => {
-        el.style.color = '#0078cb';
-      });
-
-      // (3) 표(Table) 스타일링 (테두리, 헤더 배경 #e6eeff) 및 표 내부 볼드체 색상 원복
-      doc.querySelectorAll('table').forEach((table: any) => {
-        table.style.borderCollapse = 'collapse';
-        table.style.width = '100%';
-        table.style.border = '2px solid #e6eeff';
-        
-        // 표 안의 볼드체는 다시 검은색으로
-        table.querySelectorAll('strong').forEach((el: any) => {
-          el.style.color = '#000000';
-        });
-      });
-      
-      doc.querySelectorAll('th').forEach((th: any) => {
-        th.style.backgroundColor = '#e6eeff';
-        th.style.border = '1px solid #e6eeff';
-        th.style.padding = '10px';
-      });
-      
-      doc.querySelectorAll('td').forEach((td: any) => {
-        td.style.border = '1px solid #e6eeff';
-        td.style.padding = '10px';
-      });
-
-      htmlText = doc.body.innerHTML;
-
-      // 4. 클립보드에 HTML(Rich Text) 포맷으로 쓰기
-      const clipboardItem = new ClipboardItem({
-        'text/plain': new Blob([markdownText], { type: 'text/plain' }),
-        'text/html': new Blob([htmlText], { type: 'text/html' }),
-      });
-      await navigator.clipboard.write([clipboardItem]);
+      await copyMarkdownToNaverBlog(markdownText);
       
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
@@ -163,6 +152,28 @@ ${data.implications}
       alert('블로그 복사 중 오류가 발생했습니다.');
     } finally {
       setIsCopying(false);
+    }
+  };
+
+  const handleCopySection = async (sIdx: number) => {
+    try {
+      const section = data.sections[sIdx];
+      const markdownText = `
+## ${section.title}
+${fixMarkdownTables(section.easyExplanation || '')}
+
+${section.charts?.length > 0 ? section.charts.map((chart) => {
+  return `\n\n> 🖼️ **[여기에 '${chart.title}' 차트를 캡처해서 붙여넣으세요]**\n\n`;
+}).join('\n') : ''}
+      `.trim();
+
+      await copyMarkdownToNaverBlog(markdownText);
+      
+      setCopiedSectionId(sIdx);
+      setTimeout(() => setCopiedSectionId(null), 2000);
+    } catch (err) {
+      console.error("Clipboard API failed", err);
+      alert('섹션 복사 중 오류가 발생했습니다.');
     }
   };
 
@@ -330,9 +341,22 @@ ${data.implications}
         <div key={idx} className={styles.sectionWrapper} style={{ marginBottom: '1.25rem' }}>
           
           <section className={styles.section}>
-            <div className={styles.sectionHeader}>
-              <BookOpen className={styles.icon} size={28} />
-              <h2 className={styles.sectionTitle}>{section.title}</h2>
+            <div className={styles.sectionHeader} style={{ justifyContent: 'space-between' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                <BookOpen className={styles.icon} size={28} />
+                <h2 className={styles.sectionTitle}>{section.title}</h2>
+              </div>
+              {!section.isLoading && (
+                <button 
+                  onClick={() => handleCopySection(idx)}
+                  className={styles.copyButton}
+                  style={{ padding: '0.4rem 0.75rem', fontSize: '0.85rem' }}
+                  title="이 챕터만 블로그 양식으로 복사합니다"
+                >
+                  {copiedSectionId === idx ? <Check size={16} /> : <Copy size={16} />}
+                  <span style={{ marginLeft: '4px' }}>{copiedSectionId === idx ? '복사 완료' : '이 파트만 복사'}</span>
+                </button>
+              )}
             </div>
             
             {section.isLoading ? (
