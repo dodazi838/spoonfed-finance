@@ -132,11 +132,8 @@ ${data.summary?.map(s => `- ${s}`).join('\n')}
 ---
 ${data.sections?.map((section, sIdx) => `
 ## ${section.title}
-${fixMarkdownTables(section.easyExplanation || '')}
 
-${section.charts?.length > 0 ? section.charts.map((chart, cIdx) => {
-  return `\n\n> 🖼️ **[여기에 '${chart.title}' 차트를 캡처해서 붙여넣으세요]**\n\n`;
-}).join('\n') : ''}
+${fixMarkdownTables(section.easyExplanation || '')}
 ---
 `).join('\n') || ''}
 
