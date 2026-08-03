@@ -110,7 +110,8 @@ export default function ReportResult({ data }: { data: ReportData }) {
       td.style.padding = '10px';
     });
 
-    htmlText = doc.body.innerHTML;
+    // 전체 내용을 div로 감싸서 네이버 블로그 에디터의 스타일 번짐(전체 볼드화 등)을 방지합니다.
+    htmlText = `<div style="font-weight: normal;">${doc.body.innerHTML}</div>`;
 
     const clipboardItem = new ClipboardItem({
       'text/plain': new Blob([markdownText], { type: 'text/plain' }),
@@ -160,11 +161,8 @@ ${data.implications}
       const section = data.sections[sIdx];
       const markdownText = `
 ## ${section.title}
-${fixMarkdownTables(section.easyExplanation || '')}
 
-${section.charts?.length > 0 ? section.charts.map((chart) => {
-  return `\n\n> 🖼️ **[여기에 '${chart.title}' 차트를 캡처해서 붙여넣으세요]**\n\n`;
-}).join('\n') : ''}
+${fixMarkdownTables(section.easyExplanation || '')}
       `.trim();
 
       await copyMarkdownToNaverBlog(markdownText);
