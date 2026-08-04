@@ -75,6 +75,11 @@ export async function POST(req: NextRequest) {
     }
 
     const parsedData = parsed.data;
+    
+    // 짧은 보고서의 경우 AI가 chapters를 반환하지 않고 sections만 반환하므로, UI 호환성을 위해 chapters를 생성해줍니다.
+    if (parsedData.sections && !parsedData.chapters) {
+      parsedData.chapters = parsedData.sections.map((s: any) => s.title);
+    }
     parsedData.fileUri = uploadResult.file.uri;
     parsedData.mimeType = uploadResult.file.mimeType;
     if (usage) parsedData.usage = usage;
