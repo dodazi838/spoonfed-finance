@@ -1,4 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { GoogleAIFileManager } from '@google/generative-ai/server';
+import fs from 'fs/promises';
+import path from 'path';
+import os from 'os';
 
 export const maxDuration = 120;
 
@@ -11,109 +15,79 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'GEMINI_API_KEY 환경변수가 설정되지 않았습니다.' }, { status: 500 });
     }
 
-    // ─── 1. 업로드 시작 (Start Resumable Session) ───
+    // ─── 1. 업로드 시작 (Start Upload Session) ───
     if (contentType.includes('application/json')) {
-      const { action, fileName, fileSize, mimeType } = await req.json();
+      const { action } = await req.json();
 
       if (action === 'start') {
-        const startRes = await fetch(
-          `https://generativelanguage.googleapis.com/upload/v1beta/files?key=${apiKey}`,
-          {
-            method: 'POST',
-            headers: {
-              'X-Goog-Upload-Protocol': 'resumable',
-              'X-Goog-Upload-Command': 'start',
-              'X-Goog-Upload-Header-Content-Length': String(fileSize),
-              'X-Goog-Upload-Header-Content-Type': mimeType || 'application/pdf',
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              file: {
-                display_name: fileName || 'document.pdf',
-              },
-            }),
-          }
-        );
+        const uploadId = `${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+        const tempFilePath = path.join(os.tmpdir(), `upload_${uploadId}.pdf`);
+        
+        // 초기 빈 파일 생성
+        await fs.writeFile(tempFilePath, Buffer.alloc(0));
 
-        if (!startRes.ok) {
-          const errText = await startRes.text();
-          console.error('Google File API Start Error:', errText);
-          return NextResponse.json(
-            { error: `구글 파일 업로드 세션 생성 실패: ${startRes.statusText}` },
-            { status: startRes.status }
-          );
-        }
-
-        const uploadUrl = startRes.headers.get('x-goog-upload-url') || startRes.headers.get('X-Goog-Upload-URL');
-
-        if (!uploadUrl) {
-          return NextResponse.json(
-            { error: '구글 업로드 URL을 받지 못했습니다.' },
-            { status: 500 }
-          );
-        }
-
-        return NextResponse.json({ success: true, uploadUrl });
+        return NextResponse.json({ success: true, uploadId });
       }
 
       return NextResponse.json({ error: '잘못된 액션 요청입니다.' }, { status: 400 });
     }
 
-    // ─── 2. 청크 릴레이 전송 (Upload Chunk) ───
+    // ─── 2. 청크 수신 및 조립 (Append Chunk & Upload to Google) ───
     if (contentType.includes('multipart/form-data')) {
       const formData = await req.formData();
-      const uploadUrl = formData.get('uploadUrl') as string;
-      const offsetStr = formData.get('offset') as string;
+      const uploadId = formData.get('uploadId') as string;
       const isFinal = formData.get('isFinal') === 'true';
+      const fileName = (formData.get('fileName') as string) || 'document.pdf';
+      const mimeType = (formData.get('mimeType') as string) || 'application/pdf';
       const chunk = formData.get('chunk') as File;
 
-      if (!uploadUrl || !offsetStr || !chunk) {
+      if (!uploadId || !chunk) {
         return NextResponse.json(
-          { error: '필수 파라미터(uploadUrl, offset, chunk)가 누락되었습니다.' },
+          { error: '필수 파라미터(uploadId, chunk)가 누락되었습니다.' },
           { status: 400 }
         );
       }
 
-      const offset = parseInt(offsetStr, 10);
+      const tempFilePath = path.join(os.tmpdir(), `upload_${uploadId}.pdf`);
       const chunkBytes = await chunk.arrayBuffer();
-      const chunkSize = chunkBytes.byteLength;
+      const chunkBuffer = Buffer.from(chunkBytes);
 
-      const uploadRes = await fetch(uploadUrl, {
-        method: 'POST',
-        headers: {
-          'X-Goog-Upload-Offset': String(offset),
-          'X-Goog-Upload-Command': isFinal ? 'upload, finalize' : 'upload',
-          'Content-Length': String(chunkSize),
-        },
-        body: chunkBytes,
-      });
+      // 청크 데이터를 임시 파일에 누적(append)
+      await fs.appendFile(tempFilePath, chunkBuffer);
 
-      if (!uploadRes.ok) {
-        const errText = await uploadRes.text();
-        console.error('Google File API Chunk Upload Error:', errText);
-        return NextResponse.json(
-          { error: `청크 업로드 실패: ${uploadRes.statusText}` },
-          { status: uploadRes.status }
-        );
-      }
-
+      // 마지막 청크인 경우: Google AI File API로 원본 전송
       if (isFinal) {
-        const finalData = await uploadRes.json();
-        const fileInfo = finalData.file;
+        try {
+          const fileManager = new GoogleAIFileManager(apiKey);
+          const uploadResult = await fileManager.uploadFile(tempFilePath, {
+            mimeType: mimeType,
+            displayName: fileName,
+          });
 
-        return NextResponse.json({
-          success: true,
-          isFinal: true,
-          fileUri: fileInfo.uri,
-          mimeType: fileInfo.mimeType,
-          displayName: fileInfo.displayName,
-        });
+          // 임시 파일 정리
+          await fs.unlink(tempFilePath).catch(console.error);
+
+          return NextResponse.json({
+            success: true,
+            isFinal: true,
+            fileUri: uploadResult.file.uri,
+            mimeType: uploadResult.file.mimeType || mimeType,
+            displayName: uploadResult.file.displayName,
+          });
+        } catch (uploadErr: any) {
+          await fs.unlink(tempFilePath).catch(console.error);
+          console.error('Google File API Upload Error:', uploadErr);
+          return NextResponse.json(
+            { error: `구글 서버 업로드 실패: ${uploadErr.message || '알 수 없는 오류'}` },
+            { status: 500 }
+          );
+        }
       }
 
+      // 중간 청크 수신 성공
       return NextResponse.json({
         success: true,
         isFinal: false,
-        uploadedBytes: offset + chunkSize,
       });
     }
 

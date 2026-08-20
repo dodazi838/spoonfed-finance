@@ -54,22 +54,17 @@ async function uploadPdfInChunks(
   file: File,
   onProgress?: (percent: number, statusText: string) => void
 ): Promise<{ fileUri: string; mimeType: string }> {
-  const CHUNK_SIZE = 2 * 1024 * 1024; // 2MB
+  const CHUNK_SIZE = 2.5 * 1024 * 1024; // 2.5MB (Vercel 4.5MB 한도 내 안전한 크기)
   const totalSize = file.size;
   const fileName = file.name;
   const mimeType = file.type || 'application/pdf';
 
-  // 1. 구글 Resumable 세션 시작
-  onProgress?.(0, '구글 전용 업로드 세션 생성 중...');
+  // 1. 업로드 세션 생성
+  onProgress?.(0, '업로드 세션 생성 중...');
   const startRes = await fetch('/api/upload', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      action: 'start',
-      fileName,
-      fileSize: totalSize,
-      mimeType,
-    }),
+    body: JSON.stringify({ action: 'start' }),
   });
 
   const startText = await startRes.text();
@@ -80,11 +75,11 @@ async function uploadPdfInChunks(
     throw new Error(`업로드 세션 오류: ${startText.slice(0, 100)}`);
   }
 
-  if (!startRes.ok || !startData.uploadUrl) {
+  if (!startRes.ok || !startData.uploadId) {
     throw new Error(startData.error || '업로드 세션 생성에 실패했습니다.');
   }
 
-  const uploadUrl = startData.uploadUrl;
+  const uploadId = startData.uploadId;
   let offset = 0;
   let chunkIndex = 0;
   const totalChunks = Math.ceil(totalSize / CHUNK_SIZE);
@@ -95,13 +90,14 @@ async function uploadPdfInChunks(
     const chunkBlob = file.slice(offset, end);
     const isFinal = end >= totalSize;
 
-    const percent = Math.round((offset / totalSize) * 90);
+    const percent = Math.round(((offset + chunkBlob.size) / totalSize) * 90);
     onProgress?.(percent, `대용량 파일 전송 중 (${chunkIndex + 1}/${totalChunks}단계 - ${percent}%)...`);
 
     const chunkFormData = new FormData();
-    chunkFormData.append('uploadUrl', uploadUrl);
-    chunkFormData.append('offset', String(offset));
+    chunkFormData.append('uploadId', uploadId);
     chunkFormData.append('isFinal', String(isFinal));
+    chunkFormData.append('fileName', fileName);
+    chunkFormData.append('mimeType', mimeType);
     chunkFormData.append('chunk', chunkBlob, fileName);
 
     const chunkRes = await fetch('/api/upload', {
