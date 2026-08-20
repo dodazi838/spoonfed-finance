@@ -16,16 +16,19 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'fileUri and chapterTitle are required' }, { status: 400 });
     }
 
-    const model = createModel(selectedModel, 16384);
     const prompt = buildChapterPrompt(chapterTitle);
 
-    // Gemini API 호출 (with 재시도)
+    // Gemini API 호출 with 자동 재시도 및 모델 백업 폴백
     const result = await callWithRetry(
-      () => model.generateContent([
-        prompt,
-        { fileData: { fileUri, mimeType } },
-      ]),
-      { context: 'analyze-chapter' }
+      async (attempt) => {
+        const currentModelName = attempt >= 2 ? 'gemini-2.5-flash' : selectedModel;
+        const currentModel = createModel(currentModelName, 16384);
+        return await currentModel.generateContent([
+          prompt,
+          { fileData: { fileUri, mimeType } },
+        ]);
+      },
+      { context: 'analyze-chapter', retries: 3, initialDelay: 1500 }
     );
 
     const responseText = result.response.text();
