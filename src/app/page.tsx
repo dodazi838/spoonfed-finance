@@ -116,7 +116,14 @@ export default function Home() {
         body: formData,
       });
 
-      const data = await response.json();
+      // Vercel이 에러를 반환할 때 JSON이 아닌 텍스트(예: "Request Entity Too Large")를 보내는 경우를 안전하게 처리
+      const responseText = await response.text();
+      let data;
+      try {
+        data = JSON.parse(responseText);
+      } catch {
+        throw new Error(`서버 응답 오류: ${responseText.slice(0, 100)}`);
+      }
 
       if (!response.ok) {
         throw new Error(data.error || '리포트 요약 중 오류가 발생했습니다.');
@@ -200,7 +207,14 @@ export default function Home() {
           })
         });
 
-        const chapterData = await chapterRes.json();
+        // Vercel 에러 시 안전한 JSON 파싱
+        const chapterText = await chapterRes.text();
+        let chapterData;
+        try {
+          chapterData = JSON.parse(chapterText);
+        } catch {
+          chapterData = { error: `서버 응답 오류: ${chapterText.slice(0, 100)}` };
+        }
         
         if (chapterData.usage?.totalTokenCount) {
           trackTokens(chapterData.usage.totalTokenCount);
@@ -209,7 +223,7 @@ export default function Home() {
         setReportData(prev => {
           if (!prev) return prev;
           const newSections = [...prev.sections];
-          if (chapterRes.ok) {
+          if (chapterRes.ok && !chapterData.error) {
             newSections[i] = {
               title: chapterData.title || chapterTitle,
               easyExplanation: chapterData.easyExplanation,
@@ -226,8 +240,19 @@ export default function Home() {
           }
           return { ...prev, sections: newSections };
         });
-      } catch (e) {
+      } catch (e: any) {
         console.error('Failed to fetch chapter:', e);
+        setReportData(prev => {
+          if (!prev) return prev;
+          const newSections = [...prev.sections];
+          newSections[i] = {
+            title: chapterTitle,
+            easyExplanation: e.message || '네트워크 오류가 발생했습니다.',
+            charts: [],
+            isLoading: false,
+          };
+          return { ...prev, sections: newSections };
+        });
       }
     }
   };
