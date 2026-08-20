@@ -99,6 +99,13 @@ export default function Home() {
   };
 
   const handleFileSelection = async (selectedFile: File) => {
+    // Vercel 서버리스 함수 요청 크기 제한(4.5MB) 대응: 프론트에서 사전 차단
+    const MAX_FILE_SIZE = 4.5 * 1024 * 1024; // 4.5MB
+    if (selectedFile.size > MAX_FILE_SIZE) {
+      setError(`파일 크기가 너무 큽니다 (${(selectedFile.size / 1024 / 1024).toFixed(1)}MB). Vercel 무료 플랜은 최대 4.5MB까지 업로드 가능합니다. 파일을 압축하거나 분할해 주세요.`);
+      return;
+    }
+
     setFile(selectedFile);
     setError(null);
     setIsUploading(true);
