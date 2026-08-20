@@ -24,11 +24,124 @@ function checkIsShortReport(data: TocData | null): boolean {
   return data?.isShortReport === true || data?.isShortReport === 'true';
 }
 
+// ─── PDF 페이지 수 빠른 카운트 헬퍼 ───
+async function countPdfPages(file: File): Promise<number> {
+  try {
+    const arrayBuffer = await file.arrayBuffer();
+    const bytes = new Uint8Array(arrayBuffer);
+    const text = new TextDecoder('latin1').decode(bytes);
+    
+    // 1. /Type /Page 매칭 (/Pages 제외)
+    const pageMatches = text.match(/\/Type\s*\/Page\b/g);
+    if (pageMatches && pageMatches.length > 0) {
+      return pageMatches.length;
+    }
+    
+    // 2. /Count 숫자 검색
+    const countMatch = text.match(/\/Count\s+(\d+)/);
+    if (countMatch && countMatch[1]) {
+      const parsed = parseInt(countMatch[1], 10);
+      if (parsed > 0 && parsed < 10000) return parsed;
+    }
+  } catch (e) {
+    console.warn('PDF 페이지 수 감지 실패, 기본값(15) 사용:', e);
+  }
+  return 15;
+}
+
+// ─── 청크 분할 업로드 함수 ───
+async function uploadPdfInChunks(
+  file: File,
+  onProgress?: (percent: number, statusText: string) => void
+): Promise<{ fileUri: string; mimeType: string }> {
+  const CHUNK_SIZE = 2 * 1024 * 1024; // 2MB
+  const totalSize = file.size;
+  const fileName = file.name;
+  const mimeType = file.type || 'application/pdf';
+
+  // 1. 구글 Resumable 세션 시작
+  onProgress?.(0, '구글 전용 업로드 세션 생성 중...');
+  const startRes = await fetch('/api/upload', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      action: 'start',
+      fileName,
+      fileSize: totalSize,
+      mimeType,
+    }),
+  });
+
+  const startText = await startRes.text();
+  let startData;
+  try {
+    startData = JSON.parse(startText);
+  } catch {
+    throw new Error(`업로드 세션 오류: ${startText.slice(0, 100)}`);
+  }
+
+  if (!startRes.ok || !startData.uploadUrl) {
+    throw new Error(startData.error || '업로드 세션 생성에 실패했습니다.');
+  }
+
+  const uploadUrl = startData.uploadUrl;
+  let offset = 0;
+  let chunkIndex = 0;
+  const totalChunks = Math.ceil(totalSize / CHUNK_SIZE);
+
+  // 2. 청크 순차 전송
+  while (offset < totalSize) {
+    const end = Math.min(offset + CHUNK_SIZE, totalSize);
+    const chunkBlob = file.slice(offset, end);
+    const isFinal = end >= totalSize;
+
+    const percent = Math.round((offset / totalSize) * 90);
+    onProgress?.(percent, `대용량 파일 전송 중 (${chunkIndex + 1}/${totalChunks}단계 - ${percent}%)...`);
+
+    const chunkFormData = new FormData();
+    chunkFormData.append('uploadUrl', uploadUrl);
+    chunkFormData.append('offset', String(offset));
+    chunkFormData.append('isFinal', String(isFinal));
+    chunkFormData.append('chunk', chunkBlob, fileName);
+
+    const chunkRes = await fetch('/api/upload', {
+      method: 'POST',
+      body: chunkFormData,
+    });
+
+    const chunkText = await chunkRes.text();
+    let chunkData;
+    try {
+      chunkData = JSON.parse(chunkText);
+    } catch {
+      throw new Error(`청크 전송 오류: ${chunkText.slice(0, 100)}`);
+    }
+
+    if (!chunkRes.ok || !chunkData.success) {
+      throw new Error(chunkData.error || `청크(${chunkIndex + 1}) 업로드 실패`);
+    }
+
+    if (isFinal) {
+      onProgress?.(100, '파일 업로드 완료! AI 리포트 분석 준비 중...');
+      return {
+        fileUri: chunkData.fileUri,
+        mimeType: chunkData.mimeType || mimeType,
+      };
+    }
+
+    offset = end;
+    chunkIndex++;
+  }
+
+  throw new Error('업로드가 완료되지 않았습니다.');
+}
+
 export default function Home() {
   const [step, setStep] = useState<Step>('upload');
   const [isDragging, setIsDragging] = useState(false);
   const [file, setFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgressText, setUploadProgressText] = useState<string>('');
   const [error, setError] = useState<string | null>(null);
   
   const [tocData, setTocData] = useState<TocData | null>(null);
@@ -99,31 +212,43 @@ export default function Home() {
   };
 
   const handleFileSelection = async (selectedFile: File) => {
-    // Vercel 서버리스 함수 요청 크기 제한(4.5MB) 대응: FormData 오버헤드를 감안하여 4MB에서 사전 차단
-    const MAX_FILE_SIZE = 4 * 1024 * 1024; // 4MB
+    // 최대 100MB까지 지원
+    const MAX_FILE_SIZE = 100 * 1024 * 1024; // 100MB
     if (selectedFile.size > MAX_FILE_SIZE) {
-      setError(`파일 크기가 너무 큽니다 (${(selectedFile.size / 1024 / 1024).toFixed(1)}MB). 현재 배포 환경(Vercel 무료 플랜)에서는 최대 4MB까지 업로드 가능합니다. 파일을 압축하거나 분할해 주세요.`);
+      setError(`파일 크기가 너무 큽니다 (${(selectedFile.size / 1024 / 1024).toFixed(1)}MB). 최대 100MB까지 업로드 가능합니다.`);
       return;
     }
 
     setFile(selectedFile);
     setError(null);
     setIsUploading(true);
+    setUploadProgressText('PDF 페이지 수 및 파일 검사 중...');
     setReportData(null);
     setTocData(null);
     setSelectedChapters([]);
     
     try {
-      const formData = new FormData();
-      formData.append('file', selectedFile);
-      formData.append('modelName', selectedModel);
+      // 1. PDF 페이지 수 확인
+      const numPages = await countPdfPages(selectedFile);
 
-      const response = await fetch('/api/analyze', {
-        method: 'POST',
-        body: formData,
+      // 2. 청크 분할 릴레이 업로드 실행
+      const { fileUri, mimeType } = await uploadPdfInChunks(selectedFile, (_percent, statusText) => {
+        setUploadProgressText(statusText);
       });
 
-      // Vercel이 에러를 반환할 때 JSON이 아닌 텍스트(예: "Request Entity Too Large")를 보내는 경우를 안전하게 처리
+      // 3. AI 분석 요청 (/api/analyze)
+      setUploadProgressText('AI가 보고서 핵심 목차 및 내용을 심층 스캔 중입니다...');
+      const response = await fetch('/api/analyze', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          fileUri,
+          mimeType,
+          numPages,
+          modelName: selectedModel,
+        }),
+      });
+
       const responseText = await response.text();
       let data;
       try {
@@ -345,8 +470,8 @@ export default function Home() {
             {isUploading ? (
               <div className={styles.centeredColumn}>
                 <Loader2 className={styles.uploadIcon} style={{ animation: 'spin 2s linear infinite' }} />
-                <h3 className={styles.uploadText}>리포트 분석 진행 중...</h3>
-                <p className={styles.uploadSubtext}>주요 목차 및 핵심 내용 스캔 중 (약 10~20초 소요)</p>
+                <h3 className={styles.uploadText}>{uploadProgressText || '리포트 분석 진행 중...'}</h3>
+                <p className={styles.uploadSubtext}>대용량 파일 청크 전송 및 AI 심층 스캔 중입니다</p>
               </div>
             ) : file ? (
               <div className={styles.centeredColumn}>
@@ -358,7 +483,7 @@ export default function Home() {
               <div className={styles.centeredColumn}>
                 <UploadCloud className={styles.uploadIcon} />
                 <h3 className={styles.uploadText}>PDF 형식의 경제 리포트 업로드</h3>
-                <p className={styles.uploadSubtext}>이곳에 파일을 끌어다 놓거나 클릭하여 선택하세요 (최대 10MB)</p>
+                <p className={styles.uploadSubtext}>이곳에 파일을 끌어다 놓거나 클릭하여 선택하세요 (대용량 PDF 완벽 지원)</p>
               </div>
             )}
           </div>

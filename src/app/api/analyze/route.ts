@@ -14,49 +14,71 @@ export const maxDuration = 300;
 
 export async function POST(req: NextRequest) {
   try {
-    const formData = await req.formData();
-    const file = formData.get('file') as File;
-    const selectedModel = formData.get('modelName') as string || 'gemini-3.7-flash';
+    const contentType = req.headers.get('content-type') || '';
 
-    if (!file) {
-      return NextResponse.json({ error: 'No file provided' }, { status: 400 });
+    let fileUri = '';
+    let mimeType = 'application/pdf';
+    let numPages = 15;
+    let selectedModel = 'gemini-3.7-flash';
+
+    // ─── A. 청크 업로드 완료 후 fileUri로 호출된 경우 (대용량 지원) ───
+    if (contentType.includes('application/json')) {
+      const body = await req.json();
+      fileUri = body.fileUri;
+      mimeType = body.mimeType || 'application/pdf';
+      numPages = body.numPages || 15;
+      selectedModel = body.modelName || 'gemini-3.7-flash';
+
+      if (!fileUri) {
+        return NextResponse.json({ error: 'fileUri가 누락되었습니다.' }, { status: 400 });
+      }
+    } 
+    // ─── B. 기존 FormData 방식 (하위 호환) ───
+    else if (contentType.includes('multipart/form-data')) {
+      const formData = await req.formData();
+      const file = formData.get('file') as File;
+      selectedModel = (formData.get('modelName') as string) || 'gemini-3.7-flash';
+
+      if (!file) {
+        return NextResponse.json({ error: 'No file provided' }, { status: 400 });
+      }
+
+      const bytes = await file.arrayBuffer();
+      const buffer = Buffer.from(bytes);
+      
+      const tempDir = os.tmpdir();
+      const safeFileName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
+      const tempFilePath = path.join(tempDir, `${Date.now()}_${safeFileName}`);
+      await fs.writeFile(tempFilePath, buffer);
+
+      const apiKey = process.env.GEMINI_API_KEY!;
+      const fileManager = new GoogleAIFileManager(apiKey);
+      const uploadResult = await fileManager.uploadFile(tempFilePath, {
+        mimeType: 'application/pdf',
+        displayName: file.name,
+      });
+
+      const pdfData = await pdfParse(buffer);
+      numPages = pdfData.numpages;
+      fileUri = uploadResult.file.uri;
+      mimeType = uploadResult.file.mimeType;
+
+      await fs.unlink(tempFilePath).catch(console.error);
+    } else {
+      return NextResponse.json({ error: '지원하지 않는 요청 형식입니다.' }, { status: 400 });
     }
 
-    // 1. 파일을 임시 폴더에 저장
-    const bytes = await file.arrayBuffer();
-    const buffer = Buffer.from(bytes);
-    
-    const tempDir = os.tmpdir();
-    const safeFileName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
-    const tempFilePath = path.join(tempDir, `${Date.now()}_${safeFileName}`);
-    await fs.writeFile(tempFilePath, buffer);
-
-    // 2. Gemini 서버로 PDF 업로드
-    const apiKey = process.env.GEMINI_API_KEY!;
-    const fileManager = new GoogleAIFileManager(apiKey);
-    const uploadResult = await fileManager.uploadFile(tempFilePath, {
-      mimeType: 'application/pdf',
-      displayName: file.name,
-    });
-
-    // 3. 페이지 수 판별 (파일 삭제 전에 수행)
-    const pdfData = await pdfParse(buffer);
-    const numPages = pdfData.numpages;
     const isShortReport = numPages <= 10;
-
-    // 4. 임시 파일 삭제
-    await fs.unlink(tempFilePath).catch(console.error);
-
     const model = createModel(selectedModel, isShortReport ? 16384 : 8192);
     const prompt = isShortReport
       ? buildShortReportPrompt(numPages)
       : buildLongReportPrompt(numPages);
 
-    // 5. Gemini API 호출 (with 재시도)
+    // Gemini API 호출 (with 재시도)
     const result = await callWithRetry(
       () => model.generateContent([
         prompt,
-        { fileData: { fileUri: uploadResult.file.uri, mimeType: uploadResult.file.mimeType } }
+        { fileData: { fileUri, mimeType } }
       ]),
       { context: 'analyze' }
     );
@@ -64,7 +86,7 @@ export async function POST(req: NextRequest) {
     const responseText = result.response.text();
     const usage = result.response.usageMetadata;
 
-    // 6. JSON 파싱
+    // JSON 파싱
     const parsed = parseAIResponse(responseText);
     if (!parsed.success) {
       console.error('JSON Parse Error in analyze:', parsed.error);
@@ -80,8 +102,8 @@ export async function POST(req: NextRequest) {
     if (parsedData.sections && !parsedData.chapters) {
       parsedData.chapters = parsedData.sections.map((s: any) => s.title);
     }
-    parsedData.fileUri = uploadResult.file.uri;
-    parsedData.mimeType = uploadResult.file.mimeType;
+    parsedData.fileUri = fileUri;
+    parsedData.mimeType = mimeType;
     if (usage) parsedData.usage = usage;
 
     return NextResponse.json(parsedData);
