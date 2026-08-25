@@ -69,21 +69,18 @@ export async function POST(req: NextRequest) {
     }
 
     const isShortReport = numPages <= 10;
+    const model = createModel(selectedModel, isShortReport ? 16384 : 8192);
     const prompt = isShortReport
       ? buildShortReportPrompt(numPages)
       : buildLongReportPrompt(numPages);
 
-    // Gemini API 호출 with 자동 재시도 및 모델 백업 폴백
+    // Gemini API 호출 (with 재시도)
     const result = await callWithRetry(
-      async (attempt) => {
-        const currentModelName = attempt >= 2 ? 'gemini-2.5-flash' : selectedModel;
-        const currentModel = createModel(currentModelName, isShortReport ? 16384 : 8192);
-        return await currentModel.generateContent([
-          prompt,
-          { fileData: { fileUri, mimeType } }
-        ]);
-      },
-      { context: 'analyze', retries: 3, initialDelay: 1500 }
+      () => model.generateContent([
+        prompt,
+        { fileData: { fileUri, mimeType } }
+      ]),
+      { context: 'analyze' }
     );
 
     const responseText = result.response.text();

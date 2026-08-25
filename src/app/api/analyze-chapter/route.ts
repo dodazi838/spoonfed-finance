@@ -16,19 +16,16 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'fileUri and chapterTitle are required' }, { status: 400 });
     }
 
+    const model = createModel(selectedModel, 16384);
     const prompt = buildChapterPrompt(chapterTitle);
 
-    // Gemini API 호출 with 자동 재시도 및 모델 백업 폴백
+    // Gemini API 호출 (with 재시도)
     const result = await callWithRetry(
-      async (attempt) => {
-        const currentModelName = attempt >= 2 ? 'gemini-2.5-flash' : selectedModel;
-        const currentModel = createModel(currentModelName, 16384);
-        return await currentModel.generateContent([
-          prompt,
-          { fileData: { fileUri, mimeType } },
-        ]);
-      },
-      { context: 'analyze-chapter', retries: 3, initialDelay: 1500 }
+      () => model.generateContent([
+        prompt,
+        { fileData: { fileUri, mimeType } },
+      ]),
+      { context: 'analyze-chapter' }
     );
 
     const responseText = result.response.text();
@@ -47,9 +44,17 @@ export async function POST(req: NextRequest) {
       });
     }
 
+    let easyExplanation = parsed.data.easyExplanation || '';
+    if (!easyExplanation.trim() && parsed.data.charts && parsed.data.charts.length > 0) {
+      const chartSummaries = parsed.data.charts
+        .map((c: any) => `- **${c.title}**: ${c.description || '주요 데이터 추이 분석'}`)
+        .join('\n');
+      easyExplanation = `> 해당 챕터의 핵심 데이터 및 통계 지표 분석\n\n${chartSummaries}`;
+    }
+
     return NextResponse.json({
       title: parsed.data.title || chapterTitle,
-      easyExplanation: parsed.data.easyExplanation,
+      easyExplanation,
       charts: parsed.data.charts || [],
       usage,
     });
