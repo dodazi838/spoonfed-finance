@@ -290,7 +290,7 @@ export default function Home() {
       if (prev.includes(chapter)) {
         return prev.filter(c => c !== chapter);
       }
-      const limit = checkIsShortReport(tocData) ? 999 : 3;
+      const limit = checkIsShortReport(tocData) ? 999 : 4;
       if (prev.length >= limit) return prev;
       return [...prev, chapter];
     });
