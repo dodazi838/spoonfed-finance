@@ -433,12 +433,18 @@ export default function Home() {
   const tokenFormatted = (dailyTokens / 1000).toFixed(1) + 'k';
   const tokenColor = dailyTokens > (MAX_DAILY_TOKENS * 0.8) ? '#ef4444' : dailyTokens > (MAX_DAILY_TOKENS * 0.5) ? '#f59e0b' : '#2563eb';
 
+  const handleLogout = () => {
+    if (confirm('정말 로그아웃 하시겠습니까?')) {
+      logout();
+    }
+  };
+
   return (
     <main className={styles.container}>
       
       {/* ─── 상단 글로벌 네비게이션 ─── */}
       <nav className={styles.navbar}>
-        <div className={styles.navBrand} onClick={resetAll}>
+        <div className={styles.navBrand} onClick={resetAll} title="홈으로 가기 (초기 화면)">
           <Sparkles size={20} className={styles.navBrandLogo} />
           <span>SPOONFED FINANCE</span>
         </div>
@@ -470,7 +476,7 @@ export default function Home() {
                 </div>
               )}
               <span className={styles.userName}>{user.displayName || user.email?.split('@')[0]}</span>
-              <button className={styles.logoutNavBtn} onClick={logout} title="로그아웃">
+              <button className={styles.logoutNavBtn} onClick={handleLogout} title="로그아웃">
                 <LogOut size={14} />
               </button>
             </div>
