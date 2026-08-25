@@ -1,9 +1,12 @@
 'use client';
 
 import { useState, useCallback, useEffect } from 'react';
-import { UploadCloud, FileText, Loader2, AlertCircle, CheckSquare, Square } from 'lucide-react';
+import { UploadCloud, FileText, Loader2, AlertCircle, CheckSquare, Square, Sparkles, BookOpen, LogIn, LogOut, BookmarkCheck } from 'lucide-react';
 import styles from './page.module.css';
 import ReportResult, { ReportData } from '@/components/ReportResult';
+import { useAuth } from '@/lib/auth-context';
+import ArchiveDrawer from '@/components/ArchiveDrawer';
+import { saveReportToArchive } from '@/lib/archive-service';
 
 // ─── 타입 정의 ───
 type Step = 'upload' | 'select' | 'analyze';
@@ -133,6 +136,10 @@ async function uploadPdfInChunks(
 }
 
 export default function Home() {
+  const { user, signInWithGoogle, logout } = useAuth();
+  const [isArchiveOpen, setIsArchiveOpen] = useState(false);
+  const [isSavedToArchive, setIsSavedToArchive] = useState(false);
+
   const [step, setStep] = useState<Step>('upload');
   const [isDragging, setIsDragging] = useState(false);
   const [file, setFile] = useState<File | null>(null);
@@ -270,6 +277,13 @@ export default function Home() {
         };
         setReportData(initialData);
         setStep('analyze');
+
+        // 로그인된 상태라면 서고에 자동 저장
+        if (user) {
+          saveReportToArchive(user.uid, selectedFile.name, initialData, true)
+            .then(() => setIsSavedToArchive(true))
+            .catch(err => console.error('Auto-save error:', err));
+        }
       } else {
         setTocData(data);
         setStep('select');
@@ -383,6 +397,20 @@ export default function Home() {
         });
       }
     }
+
+    // 모든 챕터 분석 완료 후 서고에 자동 저장
+    if (user && file) {
+      setTimeout(() => {
+        setReportData(current => {
+          if (current && current.sections && current.sections.length > 0) {
+            saveReportToArchive(user.uid, file.name, current, false)
+              .then(() => setIsSavedToArchive(true))
+              .catch(err => console.error('Auto-save chapters error:', err));
+          }
+          return current;
+        });
+      }, 500);
+    }
   };
 
   const resetAll = () => {
@@ -392,6 +420,7 @@ export default function Home() {
     setTocData(null);
     setSelectedChapters([]);
     setError(null);
+    setIsSavedToArchive(false);
   };
 
   // ─── 렌더링 ───
@@ -406,6 +435,53 @@ export default function Home() {
 
   return (
     <main className={styles.container}>
+      
+      {/* ─── 상단 글로벌 네비게이션 ─── */}
+      <nav className={styles.navbar}>
+        <div className={styles.navBrand} onClick={resetAll}>
+          <Sparkles size={20} className={styles.navBrandLogo} />
+          <span>SPOONFED FINANCE</span>
+        </div>
+
+        <div className={styles.navActions}>
+          {/* 서고 열기 버튼 */}
+          <button 
+            className={styles.archiveNavBtn}
+            onClick={() => {
+              if (!user) {
+                signInWithGoogle();
+              } else {
+                setIsArchiveOpen(true);
+              }
+            }}
+          >
+            <BookOpen size={16} />
+            <span>나의 서고</span>
+          </button>
+
+          {/* 로그인 / 프로필 */}
+          {user ? (
+            <div className={styles.userProfile}>
+              {user.photoURL ? (
+                <img src={user.photoURL} alt={user.displayName || 'User'} className={styles.userAvatar} />
+              ) : (
+                <div className={styles.userAvatar} style={{ background: '#38bdf8', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.8rem', fontWeight: 'bold' }}>
+                  {(user.displayName || user.email || 'U')[0].toUpperCase()}
+                </div>
+              )}
+              <span className={styles.userName}>{user.displayName || user.email?.split('@')[0]}</span>
+              <button className={styles.logoutNavBtn} onClick={logout} title="로그아웃">
+                <LogOut size={14} />
+              </button>
+            </div>
+          ) : (
+            <button className={styles.loginNavBtn} onClick={signInWithGoogle}>
+              <LogIn size={16} />
+              <span>Google 로그인</span>
+            </button>
+          )}
+        </div>
+      </nav>
       
       <section className={`${styles.hero} animate-fade-in`}>
         <div className={styles.badge}>FINANCIAL REPORT INTELLIGENCE</div>
@@ -564,13 +640,36 @@ export default function Home() {
         </section>
       )}
 
-      {step === 'analyze' && reportData && <ReportResult data={reportData} />}
+      {step === 'analyze' && reportData && (
+        <>
+          {isSavedToArchive && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: '#10b981', fontSize: '0.85rem', fontWeight: 600, marginBottom: '-1rem' }}>
+              <BookmarkCheck size={16} />
+              <span>클라우드 서고에 안전하게 자동 저장되었습니다.</span>
+            </div>
+          )}
+          <ReportResult data={reportData} />
+        </>
+      )}
       
       {(step === 'analyze' || step === 'select') && (
         <button onClick={resetAll} className={styles.resetButton}>
           다른 리포트 분석하기
         </button>
       )}
+
+      {/* 서고 슬라이드 드로어 */}
+      <ArchiveDrawer
+        isOpen={isArchiveOpen}
+        onClose={() => setIsArchiveOpen(false)}
+        userId={user?.uid}
+        onSelectReport={(archivedData, fileName) => {
+          setFile(new File([], fileName));
+          setReportData(archivedData);
+          setStep('analyze');
+          setIsSavedToArchive(true);
+        }}
+      />
     </main>
   );
 }

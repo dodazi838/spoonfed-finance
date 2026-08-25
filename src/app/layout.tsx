@@ -17,6 +17,8 @@ export const metadata: Metadata = {
   description: "한국은행, 금융감독원 등 공공기관의 경제 리포트를 AI로 심층 분석합니다. 복잡한 금융·경제 보고서를 대학생도 이해할 수 있도록 쉽게 풀어드립니다.",
 };
 
+import { AuthProvider } from "@/lib/auth-context";
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -27,7 +29,11 @@ export default function RootLayout({
       <head>
         <meta name="google" content="notranslate" />
       </head>
-      <body>{children}</body>
+      <body>
+        <AuthProvider>
+          {children}
+        </AuthProvider>
+      </body>
     </html>
   );
 }
