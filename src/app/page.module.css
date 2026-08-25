@@ -228,13 +228,13 @@
 .badge {
   display: inline-block;
   background: rgba(56, 189, 248, 0.12);
-  color: #38bdf8;
+  color: var(--primary);
   padding: 0.5rem 1rem;
   border-radius: 99px;
   font-size: 0.875rem;
-  font-weight: 600;
+  font-weight: 700;
   margin-bottom: 1.5rem;
-  border: 1px solid rgba(56, 189, 248, 0.3);
+  border: 1px solid var(--border-cyan);
   letter-spacing: 0.05em;
 }
 
@@ -243,19 +243,19 @@
   font-weight: 800;
   line-height: 1.25;
   margin-bottom: 1.5rem;
-  color: #f8fafc;
+  color: var(--text-main);
   letter-spacing: -0.03em;
 }
 
 .title span {
-  background: linear-gradient(135deg, #38bdf8 0%, #818cf8 100%);
+  background: linear-gradient(135deg, var(--primary) 0%, #6366f1 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
 }
 
 .description {
   font-size: 1.15rem;
-  color: #94a3b8;
+  color: var(--text-sub);
   line-height: 1.7;
 }
 
@@ -265,28 +265,28 @@
 }
 
 .dropzone {
-  border: 2px dashed rgba(56, 189, 248, 0.3);
+  border: 2px dashed var(--dropzone-border);
   border-radius: 20px;
   padding: 3.5rem 2rem;
   text-align: center;
   transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
   cursor: pointer;
-  background: rgba(15, 23, 42, 0.7);
+  background: var(--dropzone-bg);
   backdrop-filter: blur(16px);
-  box-shadow: 0 12px 35px rgba(0, 0, 0, 0.35);
+  box-shadow: var(--glass-shadow);
 }
 
 .dropzone:hover, .dropzone.active {
-  border-color: #38bdf8;
-  background: rgba(30, 41, 59, 0.85);
-  box-shadow: 0 16px 40px rgba(56, 189, 248, 0.18);
+  border-color: var(--dropzone-hover-border);
+  background: var(--dropzone-hover-bg);
+  box-shadow: 0 16px 40px rgba(2, 132, 199, 0.18);
   transform: translateY(-3px);
 }
 
 .uploadIcon {
   width: 60px;
   height: 60px;
-  color: #38bdf8;
+  color: var(--primary);
   margin-bottom: 1.25rem;
   transition: transform 0.3s ease;
 }
@@ -298,13 +298,13 @@
 .uploadText {
   font-size: 1.25rem;
   font-weight: 700;
-  color: #f8fafc;
+  color: var(--text-main);
   margin-bottom: 0.5rem;
 }
 
 .uploadSubtext {
   font-size: 0.9rem;
-  color: #94a3b8;
+  color: var(--text-sub);
 }
 
 .fileInput {
@@ -312,33 +312,33 @@
 }
 
 .selectionSection { width: 100%; max-width: 800px; margin: 0 auto; }
-.selectionPanel { padding: 2.5rem; border-radius: 20px; background: rgba(15, 23, 42, 0.85); border: 1px solid rgba(255, 255, 255, 0.1); box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.6); backdrop-filter: blur(20px); }
-.selectionTitle { font-size: 1.75rem; margin-bottom: 1.5rem; color: #f8fafc; font-weight: 700; }
-.summaryBox { margin-bottom: 2.5rem; padding: 2rem; background: rgba(8, 14, 28, 0.95); border-radius: 16px; border: 1px solid rgba(56, 189, 248, 0.25); box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.3); }
-.summaryTitle { font-size: 1.25rem; margin-bottom: 1rem; color: #38bdf8; display: flex; align-items: center; gap: 0.5rem; font-weight: 700; }
-.summaryList { list-style-type: none; padding-left: 0; color: #cbd5e1; line-height: 1.7; display: flex; flex-direction: column; gap: 0.75rem; }
+.selectionPanel { padding: 2.5rem; border-radius: 20px; background: var(--selection-bg); border: 1px solid var(--panel-border); box-shadow: var(--glass-shadow); backdrop-filter: blur(20px); }
+.selectionTitle { font-size: 1.75rem; margin-bottom: 1.5rem; color: var(--text-main); font-weight: 700; }
+.summaryBox { margin-bottom: 2.5rem; padding: 2rem; background: var(--summary-bg); border-radius: 16px; border: 1px solid var(--summary-border); box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.04); }
+.summaryTitle { font-size: 1.25rem; margin-bottom: 1rem; color: var(--primary); display: flex; align-items: center; gap: 0.5rem; font-weight: 700; }
+.summaryList { list-style-type: none; padding-left: 0; color: var(--text-main); line-height: 1.7; display: flex; flex-direction: column; gap: 0.75rem; }
 .summaryList li { position: relative; padding-left: 1.5rem; }
-.summaryList li::before { content: '\2022'; position: absolute; left: 0; color: #38bdf8; font-size: 1.2rem; }
+.summaryList li::before { content: '\2022'; position: absolute; left: 0; color: var(--primary); font-size: 1.2rem; }
 .chapterBox { margin-bottom: 2.5rem; }
 .chapterHeader { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
-.chapterTitle { font-size: 1.25rem; color: #f8fafc; display: flex; align-items: center; gap: 0.5rem; font-weight: 700; }
-.chapterBadge { font-size: 0.875rem; background: rgba(0,0,0,0.5); padding: 0.25rem 0.75rem; border-radius: 99px; }
-.chapterBadgeActive { color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.3); }
+.chapterTitle { font-size: 1.25rem; color: var(--text-main); display: flex; align-items: center; gap: 0.5rem; font-weight: 700; }
+.chapterBadge { font-size: 0.875rem; background: var(--panel-bg); border: 1px solid var(--panel-border); padding: 0.25rem 0.75rem; border-radius: 99px; }
+.chapterBadgeActive { color: var(--primary); border: 1px solid var(--border-cyan); }
 .chapterBadgeWarning { color: #f43f5e; border: 1px solid rgba(244, 63, 94, 0.3); }
-.chapterDesc { color: #94a3b8; font-size: 0.95rem; margin-bottom: 1.5rem; }
+.chapterDesc { color: var(--text-sub); font-size: 0.95rem; margin-bottom: 1.5rem; }
 .chapterList { display: flex; flex-direction: column; gap: 0.75rem; }
-.chapterItem { display: flex; align-items: center; gap: 1rem; padding: 1.25rem; background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; cursor: pointer; transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); }
-.chapterItem:hover { background: rgba(30, 41, 59, 0.9); border-color: rgba(56, 189, 248, 0.3); transform: translateY(-2px); }
-.chapterItemActive { background: rgba(56, 189, 248, 0.1); border-color: rgba(56, 189, 248, 0.5); box-shadow: 0 4px 15px rgba(56, 189, 248, 0.1); }
-.chapterItemActive:hover { background: rgba(56, 189, 248, 0.15); border-color: #38bdf8; transform: translateY(-2px); }
+.chapterItem { display: flex; align-items: center; gap: 1rem; padding: 1.25rem; background: var(--chapter-bg); border: 1px solid var(--chapter-border); border-radius: 12px; cursor: pointer; transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); }
+.chapterItem:hover { background: var(--panel-hover); border-color: var(--primary); transform: translateY(-2px); }
+.chapterItemActive { background: var(--chapter-active-bg); border-color: var(--chapter-active-border); box-shadow: 0 4px 15px rgba(2, 132, 199, 0.1); }
+.chapterItemActive:hover { background: var(--chapter-active-bg); border-color: var(--primary-hover); transform: translateY(-2px); }
 .chapterItemDisabled { opacity: 0.4; cursor: not-allowed; }
-.chapterItemDisabled:hover { transform: none; background: rgba(15, 23, 42, 0.6); border-color: rgba(255,255,255,0.08); }
+.chapterItemDisabled:hover { transform: none; background: var(--chapter-bg); border-color: var(--chapter-border); }
 .actionButtons { display: flex; gap: 1rem; justify-content: center; margin-top: 1rem; }
-.btnCancel { background: transparent; border: 1px solid rgba(255,255,255,0.2); color: white; padding: 0.875rem 2.5rem; border-radius: 99px; cursor: pointer; transition: all 0.3s; font-size: 1rem; }
-.btnCancel:hover { background: rgba(255,255,255,0.08); }
-.btnSubmit { background: linear-gradient(135deg, #0284c7 0%, #38bdf8 100%); border: none; color: #041324; padding: 0.875rem 2.5rem; border-radius: 99px; cursor: pointer; font-weight: 700; transition: all 0.3s; font-size: 1rem; box-shadow: 0 4px 18px 0 rgba(56, 189, 248, 0.4); }
-.btnSubmit:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 6px 24px rgba(56, 189, 248, 0.5); }
-.btnSubmit:disabled { background: #334155; color: #94a3b8; box-shadow: none; cursor: not-allowed; }
+.btnCancel { background: var(--panel-bg); border: 1px solid var(--panel-border); color: var(--text-sub); padding: 0.875rem 2.5rem; border-radius: 99px; cursor: pointer; transition: all 0.3s; font-size: 1rem; font-weight: 600; }
+.btnCancel:hover { background: var(--panel-hover); color: var(--text-main); }
+.btnSubmit { background: linear-gradient(135deg, var(--primary) 0%, #0284c7 100%); border: none; color: #ffffff; padding: 0.875rem 2.5rem; border-radius: 99px; cursor: pointer; font-weight: 700; transition: all 0.3s; font-size: 1rem; box-shadow: 0 4px 18px 0 rgba(2, 132, 199, 0.35); }
+.btnSubmit:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 6px 24px rgba(2, 132, 199, 0.45); }
+.btnSubmit:disabled { background: var(--panel-border); color: var(--text-muted); box-shadow: none; cursor: not-allowed; }
 
 /* ─── 토큰 위젯 (우측 상단 고정) ─── */
 .tokenWidget {

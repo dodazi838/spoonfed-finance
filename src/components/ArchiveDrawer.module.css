@@ -13,12 +13,13 @@
   width: 100%;
   max-width: 480px;
   height: 100%;
-  background: #0b1329;
-  border-left: 1px solid rgba(255, 255, 255, 0.1);
+  background: var(--drawer-bg);
+  border-left: 1px solid var(--drawer-border);
   display: flex;
   flex-direction: column;
-  box-shadow: -10px 0 30px rgba(0, 0, 0, 0.5);
+  box-shadow: -10px 0 30px rgba(0, 0, 0, 0.35);
   animation: slideIn 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: background-color 0.3s ease, border-color 0.3s ease;
 }
 
 .header {
@@ -26,7 +27,7 @@
   align-items: center;
   justify-content: space-between;
   padding: 1.25rem 1.5rem;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  border-bottom: 1px solid var(--drawer-border);
 }
 
 .headerLeft {
@@ -36,30 +37,30 @@
 }
 
 .headerIcon {
-  color: #38bdf8;
+  color: var(--primary);
 }
 
 .title {
   font-size: 1.15rem;
   font-weight: 700;
-  color: #f8fafc;
+  color: var(--text-main);
   margin: 0;
 }
 
 .badge {
   background: rgba(56, 189, 248, 0.15);
-  color: #38bdf8;
+  color: var(--primary);
   font-size: 0.75rem;
   font-weight: 700;
   padding: 0.2rem 0.6rem;
   border-radius: 9999px;
-  border: 1px solid rgba(56, 189, 248, 0.3);
+  border: 1px solid var(--border-cyan);
 }
 
 .closeBtn {
   background: transparent;
   border: none;
-  color: #94a3b8;
+  color: var(--text-sub);
   cursor: pointer;
   padding: 0.4rem;
   border-radius: 6px;
@@ -70,14 +71,14 @@
 }
 
 .closeBtn:hover {
-  background: rgba(255, 255, 255, 0.1);
-  color: #f8fafc;
+  background: var(--theme-btn-hover);
+  color: var(--text-main);
 }
 
 .searchContainer {
   position: relative;
   padding: 1rem 1.5rem;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  border-bottom: 1px solid var(--drawer-border);
 }
 
 .searchIcon {
@@ -85,23 +86,23 @@
   left: 2.25rem;
   top: 50%;
   transform: translateY(-50%);
-  color: #64748b;
+  color: var(--text-muted);
 }
 
 .searchInput {
   width: 100%;
   padding: 0.65rem 2.2rem 0.65rem 2.4rem;
-  background: rgba(15, 23, 42, 0.8);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: var(--panel-bg);
+  border: 1px solid var(--panel-border);
   border-radius: 8px;
-  color: #f8fafc;
+  color: var(--text-main);
   font-size: 0.9rem;
   outline: none;
   transition: border-color 0.2s;
 }
 
 .searchInput:focus {
-  border-color: #38bdf8;
+  border-color: var(--primary);
 }
 
 .clearSearchBtn {
@@ -111,7 +112,7 @@
   transform: translateY(-50%);
   background: none;
   border: none;
-  color: #64748b;
+  color: var(--text-muted);
   cursor: pointer;
 }
 
@@ -128,8 +129,8 @@
 }
 
 .reportCard {
-  background: rgba(15, 23, 42, 0.6);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
   border-radius: 12px;
   padding: 1.15rem;
   cursor: pointer;
@@ -137,10 +138,10 @@
 }
 
 .reportCard:hover {
-  background: rgba(30, 41, 59, 0.8);
-  border-color: rgba(56, 189, 248, 0.4);
+  background: var(--panel-hover);
+  border-color: var(--primary);
   transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.1);
 }
 
 .cardHeader {
@@ -154,7 +155,7 @@
 .cardTitle {
   font-size: 0.98rem;
   font-weight: 600;
-  color: #f8fafc;
+  color: var(--text-main);
   margin: 0;
   line-height: 1.4;
   word-break: break-word;
@@ -163,7 +164,7 @@
 .deleteBtn {
   background: transparent;
   border: none;
-  color: #64748b;
+  color: var(--text-muted);
   cursor: pointer;
   padding: 0.3rem;
   border-radius: 4px;
@@ -192,20 +193,21 @@
   align-items: center;
   gap: 0.3rem;
   font-size: 0.75rem;
-  color: #94a3b8;
+  color: var(--text-sub);
 }
 
 .summaryPreview {
-  background: rgba(0, 0, 0, 0.2);
+  background: var(--summary-bg);
   border-radius: 6px;
   padding: 0.5rem 0.75rem;
   margin-bottom: 0.75rem;
+  border: 1px solid var(--summary-border);
 }
 
 .summaryPreview p {
   margin: 0;
   font-size: 0.82rem;
-  color: #cbd5e1;
+  color: var(--text-sub);
   line-height: 1.5;
   display: -webkit-box;
   -webkit-line-clamp: 2;
@@ -224,7 +226,7 @@
   gap: 0.3rem;
   font-size: 0.8rem;
   font-weight: 600;
-  color: #38bdf8;
+  color: var(--primary);
 }
 
 .centeredState {
@@ -234,24 +236,24 @@
   justify-content: center;
   height: 260px;
   text-align: center;
-  color: #94a3b8;
+  color: var(--text-sub);
 }
 
 .emptyIcon {
-  color: #475569;
+  color: var(--text-muted);
   margin-bottom: 1rem;
 }
 
 .emptyText {
   font-size: 1rem;
   font-weight: 600;
-  color: #e2e8f0;
+  color: var(--text-main);
   margin: 0 0 0.5rem 0;
 }
 
 .emptySubtext {
   font-size: 0.85rem;
-  color: #64748b;
+  color: var(--text-muted);
   margin: 0;
   max-width: 280px;
   line-height: 1.5;
@@ -259,7 +261,7 @@
 
 .spinner {
   animation: spin 1s linear infinite;
-  color: #38bdf8;
+  color: var(--primary);
   margin-bottom: 0.75rem;
 }
 
