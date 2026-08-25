@@ -448,10 +448,10 @@ export default function Home() {
           <div className={styles.navBrandIconWrapper}>
             <Sparkles size={20} className={styles.navBrandLogo} />
           </div>
-          <span className={styles.navBrandText}>SPOONFED FINANCE</span>
           <div className={styles.homeTooltip}>
             <span className={styles.homeTooltipTag}>홈으로 가기</span>
           </div>
+          <span className={styles.navBrandText}>SPOONFED FINANCE</span>
         </div>
 
         <div className={styles.navActions}>

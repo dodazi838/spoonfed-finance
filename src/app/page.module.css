@@ -54,34 +54,34 @@
   opacity: 0;
   overflow: hidden;
   white-space: nowrap;
-  transform: translateX(-8px);
-  transition: max-width 0.35s cubic-bezier(0.16, 1, 0.3, 1),
-              opacity 0.3s ease,
-              transform 0.35s cubic-bezier(0.16, 1, 0.3, 1),
-              margin-left 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+  transform: translateX(-6px);
+  transition: max-width 0.3s cubic-bezier(0.16, 1, 0.3, 1),
+              opacity 0.25s ease,
+              transform 0.3s cubic-bezier(0.16, 1, 0.3, 1),
+              margin 0.3s cubic-bezier(0.16, 1, 0.3, 1);
   pointer-events: none;
+  margin: 0;
 }
 
 .homeTooltipTag {
   display: inline-flex;
   align-items: center;
-  gap: 0.3rem;
   font-size: 0.75rem;
   font-weight: 600;
   color: #38bdf8;
-  background: rgba(56, 189, 248, 0.12);
-  border: 1px solid rgba(56, 189, 248, 0.35);
-  padding: 0.2rem 0.6rem;
+  background: rgba(56, 189, 248, 0.15);
+  border: 1px solid rgba(56, 189, 248, 0.4);
+  padding: 0.15rem 0.55rem;
   border-radius: 9999px;
   letter-spacing: normal;
-  box-shadow: 0 0 12px rgba(56, 189, 248, 0.15);
+  box-shadow: 0 0 10px rgba(56, 189, 248, 0.2);
 }
 
 .navBrand:hover .homeTooltip {
-  max-width: 130px;
+  max-width: 100px;
   opacity: 1;
   transform: translateX(0);
-  margin-left: 0.35rem;
+  margin: 0 0.1rem;
 }
 
 .navActions {
