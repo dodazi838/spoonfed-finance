@@ -407,34 +407,15 @@ export default function Home() {
   return (
     <main className={styles.container}>
       
-      {/* 글로벌 토큰 위젯 */}
-      {isClient && (
-        <div className={styles.tokenWidget} title="API 할당량 초과 에러(429) 발생 시, 분당 요청 횟수(RPM) 또는 분당 토큰(TPM) 한도에 도달한 것이므로 1~2분 후 다시 시도해주세요.">
-          <div className={styles.tokenWidgetHeader}>
-            <span className={styles.tokenWidgetLabel}>일일 무료 테스트 한도 (2M)</span>
-            <span className={styles.tokenWidgetValue}>
-              <strong className={styles.tokenWidgetValueStrong}>{tokenFormatted}</strong> / 2,000k
-            </span>
-          </div>
-          <div className={styles.tokenWidgetTrack}>
-            <div style={{ 
-              width: `${tokenPercent}%`, height: '100%', 
-              backgroundColor: tokenColor,
-              transition: 'width 0.5s ease-out, background-color 0.5s'
-            }} />
-          </div>
-        </div>
-      )}
-
       <section className={`${styles.hero} animate-fade-in`}>
-        <div className={styles.badge}>AI 기반 경제 리포트 분석기</div>
+        <div className={styles.badge}>FINANCIAL REPORT INTELLIGENCE</div>
         <h1 className={styles.title}>
-          복잡한 금융·경제 리포트,<br />
-          <span>가장 빠르고 정확하게</span> 분석하세요.
+          전문 금융·경제 리포트를<br />
+          <span>가장 깊이 있고 명쾌하게.</span>
         </h1>
         <p className={styles.description}>
-          한국은행, 금융감독원 등 공공기관의 전문 PDF 보고서를 업로드하세요.<br />
-          핵심 챕터를 선별하여, 깊이 있는 인사이트와 직관적인 데이터 차트를 도출합니다.
+          한국은행, 금융감독원 등 주요 기관의 PDF 보고서를 업로드하세요.<br />
+          원하는 챕터를 선별하여 상세한 본문 해설과 데이터 차트를 정리해 드립니다.
         </p>
       </section>
 
@@ -478,8 +459,8 @@ export default function Home() {
             ) : (
               <div className={styles.centeredColumn}>
                 <UploadCloud className={styles.uploadIcon} />
-                <h3 className={styles.uploadText}>PDF 형식의 경제 리포트 업로드</h3>
-                <p className={styles.uploadSubtext}>이곳에 파일을 끌어다 놓거나 클릭하여 선택하세요 (대용량 PDF 완벽 지원)</p>
+                <h3 className={styles.uploadText}>분석할 PDF 리포트 업로드</h3>
+                <p className={styles.uploadSubtext}>파일을 드래그하거나 클릭하여 선택하세요 (최대 100MB 지원)</p>
               </div>
             )}
           </div>
