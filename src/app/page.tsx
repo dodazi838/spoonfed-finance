@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useCallback, useEffect } from 'react';
-import { UploadCloud, FileText, Loader2, AlertCircle, CheckSquare, Square, Sparkles, BookOpen, LogIn, LogOut, BookmarkCheck } from 'lucide-react';
+import { UploadCloud, FileText, Loader2, AlertCircle, CheckSquare, Square, Sparkles, BookOpen, LogIn, LogOut, BookmarkCheck, Sun, Moon } from 'lucide-react';
 import styles from './page.module.css';
 import ReportResult, { ReportData } from '@/components/ReportResult';
 import { useAuth } from '@/lib/auth-context';
@@ -153,10 +153,19 @@ export default function Home() {
   const [selectedModel] = useState<string>('gemini-3.7-flash');
   const [dailyTokens, setDailyTokens] = useState<number>(0);
   const [isClient, setIsClient] = useState(false);
+  const [theme, setTheme] = useState<'dark' | 'light'>('dark');
 
-  // localStorage 초기화
+  // localStorage 및 테마 초기화
   useEffect(() => {
     setIsClient(true);
+    const savedTheme = localStorage.getItem('spoonfed_theme') as 'dark' | 'light' | null;
+    if (savedTheme) {
+      setTheme(savedTheme);
+      document.documentElement.setAttribute('data-theme', savedTheme);
+    } else {
+      document.documentElement.setAttribute('data-theme', 'dark');
+    }
+
     const storedStr = localStorage.getItem('spoonfed_daily_tokens');
     const storedDate = localStorage.getItem('spoonfed_token_date');
     const todayStr = new Date().toDateString();
@@ -169,6 +178,13 @@ export default function Home() {
       setDailyTokens(0);
     }
   }, []);
+
+  const toggleTheme = () => {
+    const nextTheme = theme === 'dark' ? 'light' : 'dark';
+    setTheme(nextTheme);
+    localStorage.setItem('spoonfed_theme', nextTheme);
+    document.documentElement.setAttribute('data-theme', nextTheme);
+  };
 
   const trackTokens = (newTokens: number) => {
     setDailyTokens(prev => {
@@ -455,6 +471,16 @@ export default function Home() {
         </div>
 
         <div className={styles.navActions}>
+          {/* 테마 전환 버튼 (다크 / 라이트 모드) */}
+          <button 
+            className={styles.themeToggleBtn} 
+            onClick={toggleTheme}
+            title={theme === 'dark' ? '라이트 모드로 변경' : '다크 모드로 변경'}
+            aria-label="테마 전환"
+          >
+            {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
+          </button>
+
           {/* 서고 열기 버튼 */}
           <button 
             className={styles.archiveNavBtn}
