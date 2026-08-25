@@ -444,9 +444,14 @@ export default function Home() {
       
       {/* ─── 상단 글로벌 네비게이션 ─── */}
       <nav className={styles.navbar}>
-        <div className={styles.navBrand} onClick={resetAll} title="홈으로 가기 (초기 화면)">
-          <Sparkles size={20} className={styles.navBrandLogo} />
-          <span>SPOONFED FINANCE</span>
+        <div className={styles.navBrand} onClick={resetAll}>
+          <div className={styles.navBrandIconWrapper}>
+            <Sparkles size={20} className={styles.navBrandLogo} />
+          </div>
+          <span className={styles.navBrandText}>SPOONFED FINANCE</span>
+          <div className={styles.homeTooltip}>
+            <span className={styles.homeTooltipTag}>홈으로 가기</span>
+          </div>
         </div>
 
         <div className={styles.navActions}>
