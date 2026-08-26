@@ -33,20 +33,20 @@ export function handleApiError(error: any, context: string = 'API') {
   let errorMessage = '일시적인 분석 오류가 발생했습니다: ' + (error.message || '알 수 없는 오류');
 
   if (isTransientError(error)) {
-    errorMessage = '구글 AI 서버에 일시적인 트래픽이 몰려 지연되었습니다. 잠시 후 다시 시도해 주세요. (503/429 자동 재시도 초과)';
+    errorMessage = '현재 AI 서버에 트래픽이 몰려 지연되고 있습니다. 잠시 후 다시 시도해주세요. (503 Service Unavailable)';
   }
 
   return NextResponse.json({ error: errorMessage }, { status: 500 });
 }
 
 /**
- * 지수 백오프 기반 스마트 자동 재시도 + 모델 Fallback 헬퍼
+ * 지수 백오프 기반 스마트 자동 재시도 (단일 모델 유지)
  */
 export async function callWithRetry<T>(
   fn: (attempt: number) => Promise<T>,
   {
     retries = 3,
-    initialDelay = 1500,
+    initialDelay = 2000,
     context = 'API',
   }: { retries?: number; initialDelay?: number; context?: string } = {}
 ): Promise<T> {
@@ -60,7 +60,7 @@ export async function callWithRetry<T>(
       const isTransient = isTransientError(e);
 
       if (isTransient && i < retries - 1) {
-        // 지수 백오프: 1.5s -> 3.5s -> 7s (지터 추가)
+        // 지수 백오프: 2.0s -> 4.5s -> 9.0s (지터 추가)
         const delay = initialDelay * Math.pow(2, i) + Math.random() * 500;
         console.warn(
           `[Retry ${context}] Transient Error (${e.status || e.message?.slice(0, 50)}). Retrying in ${Math.round(delay)}ms... (Attempt ${i + 1}/${retries})`

@@ -70,24 +70,17 @@ export async function POST(req: NextRequest) {
 
     const isShortReport = numPages <= 10;
     const maxTokens = isShortReport ? 16384 : 8192;
+    const model = createModel(selectedModel, maxTokens);
     const prompt = isShortReport
       ? buildShortReportPrompt(numPages)
       : buildLongReportPrompt(numPages);
 
-    // Gemini API 호출 (with 3회 스마트 재시도 & 모델 폴백)
+    // Gemini API 호출 (선택된 모델로만 3회 자동 재시도)
     const result = await callWithRetry(
-      async (attempt: number) => {
-        const activeModelName =
-          attempt >= 2 && selectedModel === 'gemini-3.7-flash'
-            ? 'gemini-2.5-flash'
-            : selectedModel;
-
-        const model = createModel(activeModelName, maxTokens);
-        return await model.generateContent([
-          prompt,
-          { fileData: { fileUri, mimeType } }
-        ]);
-      },
+      () => model.generateContent([
+        prompt,
+        { fileData: { fileUri, mimeType } }
+      ]),
       { retries: 3, initialDelay: 2000, context: 'analyze' }
     );
 
