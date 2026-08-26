@@ -707,6 +707,12 @@ export default function Home() {
           setIsSavedToArchive(true);
         }}
       />
+
+      {/* 우측 하단 버전 표시 배지 */}
+      <div className={styles.versionBadge} title="SPOONFED FINANCE v1.3.0 (2026.08.26)">
+        <span className={styles.versionDot}></span>
+        <span>v1.3.0</span>
+      </div>
     </main>
   );
 }
