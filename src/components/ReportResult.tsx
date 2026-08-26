@@ -19,9 +19,11 @@ import styles from './ReportResult.module.css';
 // Corporate Light Theme Colors (e.g., Deep Blue, Teal, Amber, Navy, Purple, Rose)
 const COLORS = ['#2563eb', '#0f766e', '#f59e0b', '#0369a1', '#6d28d9', '#be123c'];
 
-// Fix markdown tables that AI outputs on a single line (e.g. "|A|B| |C|D|")
-// by splitting them into proper multi-line format for remarkGfm to parse.
-function fixMarkdownTables(text: any): string {
+// Comprehensive Markdown Sanitizer:
+// 1. Fixes bold formatting on numbers/percents (e.g. **~15%** -> **약 15%**, ** 15% ** -> **15%**)
+// 2. Eliminates accidental GFM strikethrough caused by range tildes (e.g. 2016.1~2019.12 -> 2016.1 ～ 2019.12)
+// 3. Formats single-line AI markdown tables into proper GFM tables
+export function sanitizeMarkdownText(text: any): string {
   if (!text) return '';
   if (Array.isArray(text)) {
     text = text.join('\n');
@@ -29,14 +31,32 @@ function fixMarkdownTables(text: any): string {
     text = String(text);
   }
 
-  // Pattern: a pipe at end of a cell row, whitespace, then pipe starting next row
-  // e.g. "...내용입니다| |주요 투자..." → "...내용입니다|\n|주요 투자..."
-  let fixed = text.replace(/\|\s{1,3}\|/g, '|\n|');
-  
-  // Ensure there's a blank line before a table starts (required by GFM)
-  fixed = fixed.replace(/([^\n])\n(\|[^\n]+\|)\n(\|[\s:|-]+\|)/g, '$1\n\n$2\n$3');
-  
-  return fixed;
+  // 1. 볼드 안쪽에 물결표가 있는 경우: **~15%** -> **약 15%**
+  let sanitized = text.replace(/\*\*\s*~\s*([^*]+?)\*\*/g, '**약 $1**');
+
+  // 2. 볼드 태그 안쪽 공백 및 특수문자 정돈: ** 15% ** -> **15%**
+  sanitized = sanitized.replace(/\*\*\s+([^*]+?)\s+\*\*/g, '**$1**');
+  sanitized = sanitized.replace(/\*\*\s+([^*]+?)\*\*/g, '**$1**');
+  sanitized = sanitized.replace(/\*\*([^*]+?)\s+\*\*/g, '**$1**');
+
+  // 3. 단어/숫자/연도 사이의 물결표(~): 마크다운 취소선(<del>) 오작동 방지를 위해 전각 물결표(～)로 치환
+  // 예: (2016.1~2019.12) -> (2016.1 ～ 2019.12)
+  // 예: 5%~10% -> 5% ～ 10%
+  // 예: 100억~200억 -> 100억 ～ 200억
+  sanitized = sanitized.replace(/(\d+(?:\.\d+)?%?)\s*~\s*(\d+(?:\.\d+)?%?)/g, '$1 ～ $2');
+  sanitized = sanitized.replace(/([가-힣a-zA-Z0-9%])\s*~\s*([가-힣a-zA-Z0-9%])/g, '$1 ～ $2');
+
+  // 4. 단독 숫자 앞 물결표: ~15% -> 약 15%
+  sanitized = sanitized.replace(/(^|[\s(])~\s*(\d+(?:\.\d+)?)/g, '$1약 $2');
+
+  // 5. 남은 단독 물결표(취소선 트리거 방지)
+  sanitized = sanitized.replace(/~/g, '～');
+
+  // 6. 마크다운 표 개행 정돈
+  sanitized = sanitized.replace(/\|\s{1,3}\|/g, '|\n|');
+  sanitized = sanitized.replace(/([^\n])\n(\|[^\n]+\|)\n(\|[\s:|-]+\|)/g, '$1\n\n$2\n$3');
+
+  return sanitized;
 }
 
 export interface ChartData {
@@ -127,18 +147,18 @@ export default function ReportResult({ data }: { data: ReportData }) {
 # 보고서 핵심 한눈에 보기
 
 ## 보고서 핵심 요약
-${data.summary?.map(s => `- ${s}`).join('\n')}
+${data.summary?.map(s => `- ${sanitizeMarkdownText(s)}`).join('\n')}
 
 ---
 ${data.sections?.map((section, sIdx) => `
 ## ${section.title}
 
-${fixMarkdownTables(section.easyExplanation || '')}
+${sanitizeMarkdownText(section.easyExplanation || '')}
 ---
 `).join('\n') || ''}
 
 ## 핵심 시사점 및 전망
-${data.implications}
+${sanitizeMarkdownText(data.implications)}
       `.trim();
 
       await copyMarkdownToNaverBlog(markdownText);
@@ -159,7 +179,7 @@ ${data.implications}
       const markdownText = `
 ## ${section.title}
 
-${fixMarkdownTables(section.easyExplanation || '')}
+${sanitizeMarkdownText(section.easyExplanation || '')}
       `.trim();
 
       await copyMarkdownToNaverBlog(markdownText);
@@ -390,7 +410,7 @@ ${fixMarkdownTables(section.easyExplanation || '')}
           {data.summary?.map((item, index) => (
             <li key={index} className={styles.summaryItem}>
               <Check className={styles.checkIcon} size={20} />
-              <span>{item}</span>
+              <span>{sanitizeMarkdownText(item)}</span>
             </li>
           ))}
         </ul>
@@ -431,7 +451,7 @@ ${fixMarkdownTables(section.easyExplanation || '')}
                     remarkPlugins={[remarkGfm]} 
                     rehypePlugins={[rehypeRaw]}
                   >
-                    {fixMarkdownTables(section.easyExplanation || '')}
+                    {sanitizeMarkdownText(section.easyExplanation || '')}
                   </ReactMarkdown>
                 </div>
 
@@ -467,7 +487,7 @@ ${fixMarkdownTables(section.easyExplanation || '')}
                           <div className={styles.chartDescription}>
                             <div className="markdown-content" style={{ margin: 0, marginBottom: chart.source ? '0.5rem' : 0 }}>
                               <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw]}>
-                                {`💡 ` + chart.description}
+                                {sanitizeMarkdownText(`💡 ` + chart.description)}
                               </ReactMarkdown>
                             </div>
                             {chart.source && (
@@ -499,7 +519,7 @@ ${fixMarkdownTables(section.easyExplanation || '')}
               remarkPlugins={[remarkGfm]} 
               rehypePlugins={[rehypeRaw]}
             >
-              {`💡 ` + data.implications}
+              {sanitizeMarkdownText(`💡 ` + data.implications)}
             </ReactMarkdown>
           </div>
         </div>
