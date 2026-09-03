@@ -537,7 +537,7 @@ export default function Home() {
           
           <div className={styles.modelBadgeContainer}>
             <div className={styles.modelBadge}>
-              <strong className={styles.modelBadgeName}>Gemini 3.7 Flash</strong>
+              <strong className={styles.modelBadgeName}>Gemini 3.8 Flash</strong>
               <span className={styles.modelBadgeDesc}>최신 AI 모델 적용 중</span>
             </div>
           </div>
