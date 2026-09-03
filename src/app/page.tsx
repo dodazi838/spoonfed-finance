@@ -3,10 +3,10 @@
 import { useState, useCallback, useEffect } from 'react';
 import { UploadCloud, FileText, Loader2, AlertCircle, CheckSquare, Square, Sparkles, BookOpen, LogIn, LogOut, BookmarkCheck, Sun, Moon } from 'lucide-react';
 import styles from './page.module.css';
-import ReportResult, { ReportData } from '@/components/ReportResult';
+import ReportResult, { ReportData, SectionAnalysis } from '@/components/ReportResult';
 import { useAuth } from '@/lib/auth-context';
 import ArchiveDrawer from '@/components/ArchiveDrawer';
-import { saveReportToArchive } from '@/lib/archive-service';
+import { saveReportToArchive, syncLocalReportsToCloud } from '@/lib/archive-service';
 
 // ─── 타입 정의 ───
 type Step = 'upload' | 'select' | 'analyze';
@@ -139,6 +139,7 @@ export default function Home() {
   const { user, signInWithGoogle, logout } = useAuth();
   const [isArchiveOpen, setIsArchiveOpen] = useState(false);
   const [isSavedToArchive, setIsSavedToArchive] = useState(false);
+  const [isSavingArchive, setIsSavingArchive] = useState(false);
 
   const [step, setStep] = useState<Step>('upload');
   const [isDragging, setIsDragging] = useState(false);
@@ -192,6 +193,40 @@ export default function Home() {
       localStorage.setItem('spoonfed_daily_tokens', updated.toString());
       return updated;
     });
+  };
+
+  // 로그인 시 로컬 서고 클라우드 동기화 및 현재 활성 보고서 동기화
+  useEffect(() => {
+    if (user?.uid) {
+      syncLocalReportsToCloud(user.uid).catch(err => console.warn('Sync local reports failed:', err));
+      if (reportData) {
+        const currentFileName = file?.name || '금융_경제_리포트.pdf';
+        saveReportToArchive(user.uid, currentFileName, reportData, checkIsShortReport(tocData))
+          .then(() => setIsSavedToArchive(true))
+          .catch(err => console.warn('Sync active report to cloud failed:', err));
+      }
+    }
+  }, [user]);
+
+  // 수동 서고 저장 핸들러
+  const handleManualSaveArchive = async () => {
+    if (!reportData) return;
+    setIsSavingArchive(true);
+    try {
+      const currentFileName = file?.name || '금융_경제_리포트.pdf';
+      await saveReportToArchive(user?.uid, currentFileName, reportData, checkIsShortReport(tocData));
+      setIsSavedToArchive(true);
+      if (user) {
+        alert('✅ 분석 서고에 안전하게 저장되었습니다!');
+      } else {
+        alert('✅ 브라우저 서고에 저장되었습니다!\n(Google 로그인 시 모든 기기에서 클라우드 서고가 동기화됩니다.)');
+      }
+    } catch (e: any) {
+      console.error('Manual save failed:', e);
+      alert('서고 저장 중 오류가 발생했습니다: ' + (e.message || '알 수 없는 오류'));
+    } finally {
+      setIsSavingArchive(false);
+    }
   };
 
   // ─── 파일 핸들링 ───
@@ -294,12 +329,10 @@ export default function Home() {
         setReportData(initialData);
         setStep('analyze');
 
-        // 로그인된 상태라면 서고에 자동 저장
-        if (user) {
-          saveReportToArchive(user.uid, selectedFile.name, initialData, true)
-            .then(() => setIsSavedToArchive(true))
-            .catch(err => console.error('Auto-save error:', err));
-        }
+        // 서고(로컬 + 클라우드)에 자동 저장
+        saveReportToArchive(user?.uid, selectedFile.name, initialData, true)
+          .then(() => setIsSavedToArchive(true))
+          .catch(err => console.error('Auto-save error:', err));
       } else {
         setTocData(data);
         setStep('select');
@@ -335,7 +368,7 @@ export default function Home() {
     setStep('analyze');
     setError(null);
 
-    const initialSections = selectedChapters.map((chapterTitle: string) => ({
+    const initialSections: SectionAnalysis[] = selectedChapters.map((chapterTitle: string) => ({
       title: chapterTitle,
       isLoading: true,
     }));
@@ -349,6 +382,8 @@ export default function Home() {
     };
 
     setReportData(initialData);
+
+    const completedSections = [...initialSections];
 
     for (let i = 0; i < selectedChapters.length; i++) {
       const chapterTitle = selectedChapters[i];
@@ -378,55 +413,49 @@ export default function Home() {
           trackTokens(chapterData.usage.totalTokenCount);
         }
 
-        setReportData(prev => {
-          if (!prev) return prev;
-          const newSections = [...prev.sections];
-          if (chapterRes.ok && !chapterData.error) {
-            newSections[i] = {
-              title: chapterData.title || chapterTitle,
-              easyExplanation: chapterData.easyExplanation,
-              charts: chapterData.charts,
-              isLoading: false,
-            };
-          } else {
-            newSections[i] = {
-              title: chapterTitle,
-              easyExplanation: chapterData.error || '해당 챕터를 분석하는 중 오류가 발생했습니다.',
-              charts: [],
-              isLoading: false,
-            };
-          }
-          return { ...prev, sections: newSections };
-        });
-      } catch (e: any) {
-        console.error('Failed to fetch chapter:', e);
-        setReportData(prev => {
-          if (!prev) return prev;
-          const newSections = [...prev.sections];
-          newSections[i] = {
+        if (chapterRes.ok && !chapterData.error) {
+          completedSections[i] = {
+            title: chapterData.title || chapterTitle,
+            easyExplanation: chapterData.easyExplanation,
+            charts: chapterData.charts,
+            isLoading: false,
+          };
+        } else {
+          completedSections[i] = {
             title: chapterTitle,
-            easyExplanation: e.message || '네트워크 오류가 발생했습니다.',
+            easyExplanation: chapterData.error || '해당 챕터를 분석하는 중 오류가 발생했습니다.',
             charts: [],
             isLoading: false,
           };
-          return { ...prev, sections: newSections };
-        });
+        }
+
+        setReportData(prev => prev ? { ...prev, sections: [...completedSections] } : prev);
+      } catch (e: any) {
+        console.error('Failed to fetch chapter:', e);
+        completedSections[i] = {
+          title: chapterTitle,
+          easyExplanation: e.message || '네트워크 오류가 발생했습니다.',
+          charts: [],
+          isLoading: false,
+        };
+        setReportData(prev => prev ? { ...prev, sections: [...completedSections] } : prev);
       }
     }
 
-    // 모든 챕터 분석 완료 후 서고에 자동 저장
-    if (user && file) {
-      setTimeout(() => {
-        setReportData(current => {
-          if (current && current.sections && current.sections.length > 0) {
-            saveReportToArchive(user.uid, file.name, current, false)
-              .then(() => setIsSavedToArchive(true))
-              .catch(err => console.error('Auto-save chapters error:', err));
-          }
-          return current;
-        });
-      }, 500);
-    }
+    // 모든 챕터 분석 완료 후 최종 리포트 데이터 구성 및 서고(로컬 + 클라우드) 자동 저장
+    const finalReport: ReportData = {
+      summary: tocData?.summary || [],
+      implications: tocData?.implications || '',
+      sections: completedSections,
+      fileUri: tocData?.fileUri,
+      mimeType: tocData?.mimeType,
+    };
+    setReportData(finalReport);
+
+    const currentFileName = file?.name || '금융_경제_리포트.pdf';
+    saveReportToArchive(user?.uid, currentFileName, finalReport, false)
+      .then(() => setIsSavedToArchive(true))
+      .catch(err => console.error('Auto-save chapters error:', err));
   };
 
   const resetAll = () => {
@@ -484,13 +513,8 @@ export default function Home() {
           {/* 서고 열기 버튼 */}
           <button 
             className={styles.archiveNavBtn}
-            onClick={() => {
-              if (!user) {
-                signInWithGoogle();
-              } else {
-                setIsArchiveOpen(true);
-              }
-            }}
+            onClick={() => setIsArchiveOpen(true)}
+            title="저장된 보고서 서고 열기"
           >
             <BookOpen size={16} />
             <span>나의 서고</span>
@@ -678,15 +702,12 @@ export default function Home() {
       )}
 
       {step === 'analyze' && reportData && (
-        <>
-          {isSavedToArchive && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: '#10b981', fontSize: '0.85rem', fontWeight: 600, marginBottom: '-1rem' }}>
-              <BookmarkCheck size={16} />
-              <span>클라우드 서고에 안전하게 자동 저장되었습니다.</span>
-            </div>
-          )}
-          <ReportResult data={reportData} />
-        </>
+        <ReportResult 
+          data={reportData} 
+          onSaveArchive={handleManualSaveArchive}
+          isSaved={isSavedToArchive}
+          isSaving={isSavingArchive}
+        />
       )}
       
       {(step === 'analyze' || step === 'select') && (
@@ -709,9 +730,9 @@ export default function Home() {
       />
 
       {/* 우측 하단 버전 표시 배지 */}
-      <div className={styles.versionBadge} title="SPOONFED FINANCE v1.4.2 (2026.09.03)">
+      <div className={styles.versionBadge} title="SPOONFED FINANCE v1.4.3 (2026.09.03)">
         <span className={styles.versionDot}></span>
-        <span>v1.4.2</span>
+        <span>v1.4.3</span>
       </div>
     </main>
   );

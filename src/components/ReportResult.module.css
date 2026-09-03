@@ -195,6 +195,85 @@
   box-shadow: 0 6px 20px rgba(0, 0, 0, 0.08);
 }
 
+.archiveButton {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  background: var(--card-bg, #ffffff);
+  color: var(--primary, #0284c7);
+  border: 1.5px solid var(--primary, #0284c7);
+  padding: 1rem 1.8rem;
+  border-radius: 99px;
+  font-size: 1.05rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 15px rgba(2, 132, 199, 0.1);
+}
+
+.archiveButton:hover {
+  background: rgba(2, 132, 199, 0.08);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(2, 132, 199, 0.2);
+}
+
+.archiveButtonSaved {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  background: rgba(16, 185, 129, 0.1);
+  color: #10b981;
+  border: 1.5px solid #10b981;
+  padding: 1rem 1.8rem;
+  border-radius: 99px;
+  font-size: 1.05rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.archiveButtonSaved:hover {
+  background: rgba(16, 185, 129, 0.16);
+  transform: translateY(-2px);
+}
+
+.topArchiveBanner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--card-bg, #ffffff);
+  border: 1px solid var(--card-border, #e2e8f0);
+  border-radius: 14px;
+  padding: 0.85rem 1.25rem;
+  margin-bottom: 1.5rem;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.03);
+}
+
+.topArchiveLeft {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--text-main, #0f172a);
+}
+
+.quickSaveBtn {
+  background: var(--primary, #0284c7);
+  color: #ffffff;
+  border: none;
+  padding: 0.4rem 0.9rem;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.quickSaveBtn:hover {
+  background: var(--primary-hover, #0369a1);
+}
+
 /* PDF 인쇄(저장)용 최적화 스타일 */
 @media print {
   /* 인쇄 시 버튼들 숨기기 */

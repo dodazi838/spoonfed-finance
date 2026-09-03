@@ -26,13 +26,12 @@ export default function ArchiveDrawer({
 
   // 서고 목록 불러오기
   useEffect(() => {
-    if (isOpen && userId) {
+    if (isOpen) {
       loadReports();
     }
   }, [isOpen, userId]);
 
   const loadReports = async () => {
-    if (!userId) return;
     setLoading(true);
     try {
       const data = await getUserReports(userId);
@@ -46,7 +45,6 @@ export default function ArchiveDrawer({
 
   const handleDelete = async (e: React.MouseEvent, reportId: string) => {
     e.stopPropagation();
-    if (!userId) return;
     if (!confirm('이 보고서를 서고에서 삭제하시겠습니까?')) return;
 
     setDeletingId(reportId);
@@ -120,6 +118,12 @@ export default function ArchiveDrawer({
             </button>
           )}
         </div>
+
+        {!userId && (
+          <div style={{ padding: '0.6rem 1.5rem', background: 'rgba(2, 132, 199, 0.08)', borderBottom: '1px solid var(--drawer-border, #e2e8f0)', fontSize: '0.8rem', color: 'var(--text-sub, #64748b)', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+            <span>💡 브라우저 로컬 서고에 보관 중입니다. Google 로그인 시 클라우드로 자동 연동됩니다.</span>
+          </div>
+        )}
 
         {/* 컨텐츠 목록 */}
         <div className={styles.content}>

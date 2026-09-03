@@ -1,6 +1,6 @@
 'use client';
 
-import { Check, Copy, CheckCircle2, TrendingUp, BookOpen, FileText, Download, Loader2, Camera } from 'lucide-react';
+import { Check, Copy, CheckCircle2, TrendingUp, BookOpen, FileText, Download, Loader2, Camera, BookmarkCheck, BookmarkPlus } from 'lucide-react';
 import { 
   BarChart, Bar, 
   LineChart, Line, 
@@ -133,7 +133,17 @@ export interface ReportData {
   usage?: TokenUsage; // Usage from the initial analyze request
 }
 
-export default function ReportResult({ data }: { data: ReportData }) {
+export default function ReportResult({
+  data,
+  onSaveArchive,
+  isSaved = false,
+  isSaving = false,
+}: {
+  data: ReportData;
+  onSaveArchive?: () => void;
+  isSaved?: boolean;
+  isSaving?: boolean;
+}) {
   const [copied, setCopied] = useState(false);
   const [isCopying, setIsCopying] = useState(false);
   const [copiedSectionId, setCopiedSectionId] = useState<number | null>(null);
@@ -447,6 +457,33 @@ ${sanitizeMarkdownText(section.easyExplanation || '')}
   return (
     <div className={`${styles.container} animate-fade-in`}>
       
+      {/* 서고 저장 상태 상단 배너 */}
+      <div className={styles.topArchiveBanner}>
+        <div className={styles.topArchiveLeft}>
+          {isSaved ? (
+            <>
+              <BookmarkCheck size={20} color="#10b981" />
+              <span>이 보고서는 분석 서고에 안전하게 보관되었습니다.</span>
+            </>
+          ) : (
+            <>
+              <BookmarkPlus size={20} color="#0284c7" />
+              <span>분석 결과를 서고에 보관하고 언제든 다시 열람하세요.</span>
+            </>
+          )}
+        </div>
+        {onSaveArchive && (
+          <button 
+            onClick={onSaveArchive} 
+            className={styles.quickSaveBtn}
+            style={isSaved ? { background: '#10b981', cursor: 'default' } : {}}
+            disabled={isSaving || isSaved}
+          >
+            {isSaving ? '저장 중...' : isSaved ? '보관 완료' : '지금 서고에 저장'}
+          </button>
+        )}
+      </div>
+
       {/* 핵심 요약 */}
       <section className={styles.section}>
         <div className={styles.sectionHeader}>
@@ -572,8 +609,18 @@ ${sanitizeMarkdownText(section.easyExplanation || '')}
         </div>
       </section>
 
-      {/* 블로그 복사 및 PDF 저장 */}
+      {/* 블로그 복사 및 PDF 저장 및 서고 저장 */}
       <div className={styles.actionContainer}>
+        {onSaveArchive && (
+          <button 
+            onClick={onSaveArchive} 
+            className={isSaved ? styles.archiveButtonSaved : styles.archiveButton} 
+            disabled={isSaving}
+          >
+            {isSaving ? <Loader2 size={20} className="animate-spin" /> : (isSaved ? <BookmarkCheck size={20} /> : <BookmarkPlus size={20} />)}
+            {isSaving ? '서고 저장 중...' : (isSaved ? '서고에 보관됨' : '보고서 서고에 저장')}
+          </button>
+        )}
         <button onClick={handleCopyBlog} className={styles.copyButton} disabled={isCopying}>
           {isCopying ? <Loader2 size={20} className="animate-spin" /> : (copied ? <Check size={20} /> : <Copy size={20} />)}
           {isCopying ? '복사 중 (차트 변환)...' : (copied ? '복사 완료!' : '블로그 양식 복사 (MD)')}
