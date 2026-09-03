@@ -73,11 +73,25 @@ export function sanitizeMarkdownText(text: any): string {
   sanitized = sanitized.replace(/([^\n])\n(-\s)/g, '$1\n\n$2');
   sanitized = sanitized.replace(/(\n-\s[^\n]+)\n([가-힣a-zA-Z])/g, '$1\n\n$2');
 
-  // 5. 마크다운 표 개행 정돈
-  sanitized = sanitized.replace(/\|\s{1,3}\|/g, '|\n|');
-  sanitized = sanitized.replace(/([^\n])\n(\|[^\n]+\|)\n(\|[\s:|-]+\|)/g, '$1\n\n$2\n$3');
+  // 5. 마크다운 표(Table) 개행 및 서식 정규화 (한 줄로 뭉치거나 깨진 테이블 복원):
+  // 5-1) 행 사이에 개행 없이 파이프와 공백으로 이어진 경우 분리 (예: '|OECD| |:---|' -> '|OECD|\n|:---|')
+  sanitized = sanitized.replace(/\|\s*\|+\s*\|/g, '|\n|');
+  sanitized = sanitized.replace(/\|\s*\|/g, '|\n|');
 
-  // 6. 3개 이상 연속된 개행을 깔끔한 단락 개행(\n\n)으로 정돈
+  // 5-2) 구분선 끝에 잘못 붙은 다중 파이프 정돈 (예: ':---:||' -> ':---:|')
+  sanitized = sanitized.replace(/(\|[:\-\s]+)\|\|/g, '$1|');
+
+  // 5-3) 표 시작 전 일반 문장과의 사이에 빈 줄(\n\n) 보장
+  sanitized = sanitized.replace(/([^\n])\n?(\|[^\n]+\|)\n?(\|[:\-\s|]+\|)/g, '$1\n\n$2\n$3');
+
+  // 5-4) 표 끝난 후 바로 이어지는 일반 텍스트와의 사이에 빈 줄(\n\n) 보장
+  sanitized = sanitized.replace(/(\|[^\n]+\|)\n?([^\s\|\-\*#\n][^\n]*)/g, '$1\n\n$2');
+
+  // 6. 소제목(### ) 앞뒤 빈 줄 확보로 마크다운 헤더 파싱 안정화
+  sanitized = sanitized.replace(/([^\n])\n(###\s)/g, '$1\n\n$2');
+  sanitized = sanitized.replace(/(###[^\n]+)\n([^\s\n])/g, '$1\n\n$2');
+
+  // 7. 3개 이상 연속된 개행을 깔끔한 단락 개행(\n\n)으로 정돈
   sanitized = sanitized.replace(/\n{3,}/g, '\n\n');
 
   return sanitized;
@@ -129,6 +143,15 @@ export default function ReportResult({ data }: { data: ReportData }) {
     const parser = new DOMParser();
     const doc = parser.parseFromString(htmlText, 'text/html');
 
+    doc.querySelectorAll('h3').forEach((el: any) => {
+      el.style.fontSize = '18px';
+      el.style.fontWeight = 'bold';
+      el.style.color = '#0078cb';
+      el.style.marginTop = '26px';
+      el.style.marginBottom = '12px';
+      el.style.borderBottom = '2px solid #e6eeff';
+      el.style.paddingBottom = '6px';
+    });
     doc.querySelectorAll('p, li, blockquote').forEach((el: any) => {
       el.style.fontSize = '16px';
       el.style.lineHeight = '190%';

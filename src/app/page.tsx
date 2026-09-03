@@ -709,9 +709,9 @@ export default function Home() {
       />
 
       {/* 우측 하단 버전 표시 배지 */}
-      <div className={styles.versionBadge} title="SPOONFED FINANCE v1.4.1 (2026.09.03)">
+      <div className={styles.versionBadge} title="SPOONFED FINANCE v1.4.2 (2026.09.03)">
         <span className={styles.versionDot}></span>
-        <span>v1.4.1</span>
+        <span>v1.4.2</span>
       </div>
     </main>
   );

@@ -178,20 +178,22 @@ a {
   margin: 0;
 }
 .markdown-content h3 {
-  font-size: 1.18rem;
+  font-size: 1.2rem;
   font-weight: 700;
-  color: #0f172a;
-  padding-bottom: 0.4rem;
-  border-bottom: 2px solid #e2e8f0;
+  color: var(--text-main);
+  padding-bottom: 0.5rem;
+  margin-top: 2rem;
+  margin-bottom: 1rem;
+  border-bottom: 2px solid var(--border-cyan, #e2e8f0);
 }
 .markdown-content hr {
   border: none;
-  border-top: 1px solid #f1f5f9;
+  border-top: 1px solid var(--card-border, #f1f5f9);
   width: 100%;
 }
 .markdown-content strong {
   font-weight: 700;
-  color: #0f172a;
+  color: var(--text-main);
 }
 .markdown-content blockquote {
   background: #f0f9ff;
@@ -235,27 +237,28 @@ a {
 .markdown-content table {
   width: 100%;
   border-collapse: collapse;
-  background-color: #ffffff;
+  background-color: var(--card-bg, #ffffff);
   border-radius: 12px;
   overflow: hidden;
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--card-border, #e2e8f0);
+  margin: 1.5rem 0;
 }
 .markdown-content th {
-  background-color: #f8fafc;
-  color: #1e293b;
+  background-color: rgba(2, 132, 199, 0.08);
+  color: var(--text-main);
   font-weight: 700;
   text-align: left;
   padding: 0.85rem 1.1rem;
-  border-bottom: 2px solid #e2e8f0;
-  font-size: 1rem;
+  border-bottom: 2px solid var(--card-border, #e2e8f0);
+  font-size: 0.98rem;
 }
 .markdown-content td {
   padding: 0.85rem 1.1rem;
-  border-bottom: 1px solid #f1f5f9;
-  color: #475569;
-  font-size: 1rem;
-  line-height: 1.5;
+  border-bottom: 1px solid var(--card-border, #f1f5f9);
+  color: var(--text-sub, #475569);
+  font-size: 0.98rem;
+  line-height: 1.55;
 }
 .markdown-content tr:last-child td {
   border-bottom: none;
