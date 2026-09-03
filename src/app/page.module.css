@@ -333,6 +333,44 @@
 .chapterItemActive:hover { background: var(--chapter-active-bg); border-color: var(--primary-hover); transform: translateY(-2px); }
 .chapterItemDisabled { opacity: 0.4; cursor: not-allowed; }
 .chapterItemDisabled:hover { transform: none; background: var(--chapter-bg); border-color: var(--chapter-border); }
+
+.selectionImplications {
+  color: var(--text-sub);
+  font-size: 1rem;
+  line-height: 1.75;
+  white-space: pre-wrap;
+  background: var(--panel-bg);
+  padding: 1rem 1.25rem;
+  border-radius: 12px;
+  border: 1px solid var(--panel-border);
+}
+
+.chapterCheckActive {
+  color: var(--primary);
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.chapterCheckInactive {
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.chapterName {
+  color: var(--text-main);
+  font-size: 1.05rem;
+  font-weight: 500;
+  transition: color 0.2s ease, font-weight 0.2s ease;
+}
+
+.chapterNameActive {
+  color: var(--primary);
+  font-weight: 700;
+}
+
 .actionButtons { display: flex; gap: 1rem; justify-content: center; margin-top: 1rem; }
 .btnCancel { background: var(--panel-bg); border: 1px solid var(--panel-border); color: var(--text-sub); padding: 0.875rem 2.5rem; border-radius: 99px; cursor: pointer; transition: all 0.3s; font-size: 1rem; font-weight: 600; }
 .btnCancel:hover { background: var(--panel-hover); color: var(--text-main); }

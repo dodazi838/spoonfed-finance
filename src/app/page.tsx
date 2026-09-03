@@ -600,7 +600,7 @@ export default function Home() {
                 ))}
               </ul>
               <h3 className={styles.summaryTitle} style={{ marginTop: '1.5rem' }}>💡 시사점 및 전망</h3>
-              <p style={{ color: '#cbd5e1', lineHeight: '1.7', whiteSpace: 'pre-wrap' }}>{tocData.implications}</p>
+              <p className={styles.selectionImplications}>{tocData.implications}</p>
             </div>
 
             <div className={styles.chapterBox}>
@@ -642,10 +642,10 @@ export default function Home() {
                       onClick={() => !isDisabled && toggleChapterSelection(chapter)}
                       className={`${styles.chapterItem} ${isSelected ? styles.chapterItemActive : ''} ${isDisabled ? styles.chapterItemDisabled : ''}`}
                     >
-                      <div style={{ color: isSelected ? '#38bdf8' : '#64748b' }}>
+                      <div className={isSelected ? styles.chapterCheckActive : styles.chapterCheckInactive}>
                         {isSelected ? <CheckSquare size={24} /> : <Square size={24} />}
                       </div>
-                      <span style={{ color: isSelected ? '#f8fafc' : '#cbd5e1', fontSize: '1rem', fontWeight: isSelected ? '600' : 'normal' }}>{chapter}</span>
+                      <span className={`${styles.chapterName} ${isSelected ? styles.chapterNameActive : ''}`}>{chapter}</span>
                     </div>
                   );
                 }) : (
@@ -709,9 +709,9 @@ export default function Home() {
       />
 
       {/* 우측 하단 버전 표시 배지 */}
-      <div className={styles.versionBadge} title="SPOONFED FINANCE v1.4.0 (2026.09.03)">
+      <div className={styles.versionBadge} title="SPOONFED FINANCE v1.4.1 (2026.09.03)">
         <span className={styles.versionDot}></span>
-        <span>v1.4.0</span>
+        <span>v1.4.1</span>
       </div>
     </main>
   );

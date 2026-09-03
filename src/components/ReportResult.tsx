@@ -21,9 +21,11 @@ const COLORS = ['#2563eb', '#0f766e', '#f59e0b', '#0369a1', '#6d28d9', '#be123c'
 
 // Comprehensive Markdown Sanitizer:
 // 1. Converts HTML break tags (<br>, <br/>, <br><br>) into clean markdown paragraph breaks (\n\n)
-// 2. Fixes bold formatting on numbers/percents (e.g. **~15%** -> **약 15%**, ** 15% ** -> **15%**)
-// 3. Eliminates accidental GFM strikethrough caused by range tildes (e.g. 2016.1~2019.12 -> 2016.1 ～ 2019.12)
-// 4. Formats single-line AI markdown tables into proper GFM tables
+// 2. Automatically fixes missing spaces between Korean words/particles and numbers (e.g. 전월4.3 -> 전월 4.3, 에서0.4 -> 에서 0.4)
+// 3. Converts all **bold** markdown into <strong>bold</strong> to permanently eliminate Korean CommonMark intra-word/punctuation bold parsing failures
+// 4. Normalizes list bullet points (- items) ensuring proper newlines so they always render as rich bulleted lists
+// 5. Eliminates accidental GFM strikethrough caused by range tildes (e.g. 2016.1~2019.12 -> 2016.1 ～ 2019.12)
+// 6. Formats single-line AI markdown tables into proper GFM tables
 export function sanitizeMarkdownText(text: any): string {
   if (!text) return '';
   if (Array.isArray(text)) {
@@ -38,32 +40,44 @@ export function sanitizeMarkdownText(text: any): string {
     .replace(/<br\s*\/?>\s*<br\s*\/?>/gi, '\n\n')
     .replace(/<br\s*\/?>/gi, '\n\n');
 
-  // 1. 볼드 안쪽에 물결표가 있는 경우: **~15%** -> **약 15%**
-  sanitized = sanitized.replace(/\*\*\s*~\s*([^*]+?)\*\*/g, '**약 $1**');
+  // 1. 단어와 수치 사이 띄어쓰기 누락 자동 보정 (예: "전월4.3조엔" -> "전월 4.3조엔", "에서0.4조엔" -> "에서 0.4조엔")
+  sanitized = sanitized.replace(/([가-힣])(\d+(?:\.\d+)?(?:조|억|만|천)?(?:엔|원|달러|%|포인트|bp))/g, '$1 $2');
+  sanitized = sanitized.replace(/(에서|부터|까지|대비|기록하여|기록하며|달하여|달하며)(\d)/g, '$1 $2');
 
-  // 2. 볼드 태그 안쪽 공백 및 특수문자 정돈: ** 15% ** -> **15%**
-  sanitized = sanitized.replace(/\*\*\s+([^*]+?)\s+\*\*/g, '**$1**');
-  sanitized = sanitized.replace(/\*\*\s+([^*]+?)\*\*/g, '**$1**');
-  sanitized = sanitized.replace(/\*\*([^*]+?)\s+\*\*/g, '**$1**');
-
-  // 3. 단어/숫자/연도 사이의 물결표(~): 마크다운 취소선(<del>) 오작동 방지를 위해 전각 물결표(～)로 치환
+  // 2. 단어/숫자/연도 사이의 물결표(~): 마크다운 취소선(<del>) 오작동 방지를 위해 전각 물결표(～)로 치환
   // 예: (2016.1~2019.12) -> (2016.1 ～ 2019.12)
   // 예: 5%~10% -> 5% ～ 10%
   // 예: 100억~200억 -> 100억 ～ 200억
   sanitized = sanitized.replace(/(\d+(?:\.\d+)?%?)\s*~\s*(\d+(?:\.\d+)?%?)/g, '$1 ～ $2');
   sanitized = sanitized.replace(/([가-힣a-zA-Z0-9%])\s*~\s*([가-힣a-zA-Z0-9%])/g, '$1 ～ $2');
-
-  // 4. 단독 숫자 앞 물결표: ~15% -> 약 15%
   sanitized = sanitized.replace(/(^|[\s(])~\s*(\d+(?:\.\d+)?)/g, '$1약 $2');
-
-  // 5. 남은 단독 물결표(취소선 트리거 방지)
   sanitized = sanitized.replace(/~/g, '～');
 
-  // 6. 마크다운 표 개행 정돈
+  // 3. 볼드체(**...**) 파싱 오류 완전 박멸:
+  // CommonMark 특성상 한국어 조사/특수기호(-, %)와 공백 없이 결합 시 파싱이 깨지는 문제를 HTML <strong> 태그로 100% 안전하게 치환
+  // 예: "따라**-0.1조엔의 적자**를" -> "따라<strong>-0.1조엔의 적자</strong>를"
+  // 예: "수치는**15%**로" -> "수치는<strong>15%</strong>로"
+  // 예: "**~15%**" -> "<strong>약 15%</strong>"
+  sanitized = sanitized.replace(/\*\*(.*?)\*\*/g, (match: string, inner: string) => {
+    let content = inner.trim();
+    if (content.startsWith('~') || content.startsWith('～')) {
+      content = '약 ' + content.replace(/^[~～]\s*/, '');
+    }
+    return `<strong>${content}</strong>`;
+  });
+
+  // 4. 글머리 기호(- ) 리스트 문법 정상화:
+  // 문장 끝에 붙은 "- 항목"이나 공백 없는 "-항목"을 올바른 마크다운 리스트 문법으로 보정
+  sanitized = sanitized.replace(/([.?!])\s+-\s+([가-힣a-zA-Z])/g, '$1\n\n- $2');
+  sanitized = sanitized.replace(/(^|\n)-\s*([^\s\-\*\d])/g, '$1- $2');
+  sanitized = sanitized.replace(/([^\n])\n(-\s)/g, '$1\n\n$2');
+  sanitized = sanitized.replace(/(\n-\s[^\n]+)\n([가-힣a-zA-Z])/g, '$1\n\n$2');
+
+  // 5. 마크다운 표 개행 정돈
   sanitized = sanitized.replace(/\|\s{1,3}\|/g, '|\n|');
   sanitized = sanitized.replace(/([^\n])\n(\|[^\n]+\|)\n(\|[\s:|-]+\|)/g, '$1\n\n$2\n$3');
 
-  // 7. 3개 이상 연속된 개행을 깔끔한 단락 개행(\n\n)으로 정돈
+  // 6. 3개 이상 연속된 개행을 깔끔한 단락 개행(\n\n)으로 정돈
   sanitized = sanitized.replace(/\n{3,}/g, '\n\n');
 
   return sanitized;
