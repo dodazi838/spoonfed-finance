@@ -20,19 +20,26 @@ import styles from './ReportResult.module.css';
 const COLORS = ['#2563eb', '#0f766e', '#f59e0b', '#0369a1', '#6d28d9', '#be123c'];
 
 // Comprehensive Markdown Sanitizer:
-// 1. Fixes bold formatting on numbers/percents (e.g. **~15%** -> **약 15%**, ** 15% ** -> **15%**)
-// 2. Eliminates accidental GFM strikethrough caused by range tildes (e.g. 2016.1~2019.12 -> 2016.1 ～ 2019.12)
-// 3. Formats single-line AI markdown tables into proper GFM tables
+// 1. Converts HTML break tags (<br>, <br/>, <br><br>) into clean markdown paragraph breaks (\n\n)
+// 2. Fixes bold formatting on numbers/percents (e.g. **~15%** -> **약 15%**, ** 15% ** -> **15%**)
+// 3. Eliminates accidental GFM strikethrough caused by range tildes (e.g. 2016.1~2019.12 -> 2016.1 ～ 2019.12)
+// 4. Formats single-line AI markdown tables into proper GFM tables
 export function sanitizeMarkdownText(text: any): string {
   if (!text) return '';
   if (Array.isArray(text)) {
-    text = text.join('\n');
+    text = text.join('\n\n');
   } else if (typeof text !== 'string') {
     text = String(text);
   }
 
+  // 0. HTML 줄바꿈 태그(<br>, <br/>, <br><br>, &lt;br&gt;)를 순수 마크다운 문단 개행(\n\n)으로 변환
+  let sanitized = text
+    .replace(/&lt;br\s*\/?&gt;/gi, '\n\n')
+    .replace(/<br\s*\/?>\s*<br\s*\/?>/gi, '\n\n')
+    .replace(/<br\s*\/?>/gi, '\n\n');
+
   // 1. 볼드 안쪽에 물결표가 있는 경우: **~15%** -> **약 15%**
-  let sanitized = text.replace(/\*\*\s*~\s*([^*]+?)\*\*/g, '**약 $1**');
+  sanitized = sanitized.replace(/\*\*\s*~\s*([^*]+?)\*\*/g, '**약 $1**');
 
   // 2. 볼드 태그 안쪽 공백 및 특수문자 정돈: ** 15% ** -> **15%**
   sanitized = sanitized.replace(/\*\*\s+([^*]+?)\s+\*\*/g, '**$1**');
@@ -55,6 +62,9 @@ export function sanitizeMarkdownText(text: any): string {
   // 6. 마크다운 표 개행 정돈
   sanitized = sanitized.replace(/\|\s{1,3}\|/g, '|\n|');
   sanitized = sanitized.replace(/([^\n])\n(\|[^\n]+\|)\n(\|[\s:|-]+\|)/g, '$1\n\n$2\n$3');
+
+  // 7. 3개 이상 연속된 개행을 깔끔한 단락 개행(\n\n)으로 정돈
+  sanitized = sanitized.replace(/\n{3,}/g, '\n\n');
 
   return sanitized;
 }
