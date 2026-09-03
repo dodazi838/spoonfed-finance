@@ -73,19 +73,49 @@ export function sanitizeMarkdownText(text: any): string {
   sanitized = sanitized.replace(/([^\n])\n(-\s)/g, '$1\n\n$2');
   sanitized = sanitized.replace(/(\n-\s[^\n]+)\n([가-힣a-zA-Z])/g, '$1\n\n$2');
 
-  // 5. 마크다운 표(Table) 개행 및 서식 정규화 (한 줄로 뭉치거나 깨진 테이블 복원):
-  // 5-1) 행 사이에 개행 없이 파이프와 공백으로 이어진 경우 분리 (예: '|OECD| |:---|' -> '|OECD|\n|:---|')
-  sanitized = sanitized.replace(/\|\s*\|+\s*\|/g, '|\n|');
-  sanitized = sanitized.replace(/\|\s*\|/g, '|\n|');
+  // 4-1. 불필요한 핀(📌) 이모지 완전 제거
+  sanitized = sanitized.replace(/📌\s*/g, '');
 
-  // 5-2) 구분선 끝에 잘못 붙은 다중 파이프 정돈 (예: ':---:||' -> ':---:|')
-  sanitized = sanitized.replace(/(\|[:\-\s]+)\|\|/g, '$1|');
+  // 5. 마크다운 표(Table) 개행 및 서식 완벽 복원:
+  // 5-0) 첫 셀 뒤에 잘못 개행이 들어간 경우 한 줄로 병합 (예: '| 구분\n\n| 2026년...' -> '| 구분 | 2026년...')
+  sanitized = sanitized.replace(/(\|\s*[^\|\n]+)\n+(\|[ \t]*[^:\-\|\n])/g, '$1 $2');
 
-  // 5-3) 표 시작 전 일반 문장과의 사이에 빈 줄(\n\n) 보장
-  sanitized = sanitized.replace(/([^\n])\n?(\|[^\n]+\|)\n?(\|[:\-\s|]+\|)/g, '$1\n\n$2\n$3');
+  // 5-1) 구분선 끝의 중복 파이프 정돈 (예: ':---:||' -> ':---:|')
+  sanitized = sanitized.replace(/(\|[:\-[ \t]]+)\|\|+/g, '$1|');
 
-  // 5-4) 표 끝난 후 바로 이어지는 일반 텍스트와의 사이에 빈 줄(\n\n) 보장
-  sanitized = sanitized.replace(/(\|[^\n]+\|)\n?([^\s\|\-\*#\n][^\n]*)/g, '$1\n\n$2');
+  // 5-2) 인라인으로 붙어 있는 표 행 분리: '| |' or '|| |' or '||'
+  // [ \t]만 매칭하여 이미 있는 정상적인 개행(\n)은 절대 건드리지 않음
+  sanitized = sanitized.replace(/\|[ \t]*\|+[ \t]*\|/g, '|\n|');
+  sanitized = sanitized.replace(/\|[ \t]+\|/g, '|\n|');
+
+  // 5-3) 줄 단위로 분석하여 표 블록 앞뒤에는 \n\n, 표 내부 행들 사이에는 정확히 단일 \n 보장
+  const lines = sanitized.split('\n');
+  const resultLines: string[] = [];
+  let inTable = false;
+
+  for (let i = 0; i < lines.length; i++) {
+    const trimmed = lines[i].trim();
+    const isTableRow = trimmed.startsWith('|') && trimmed.endsWith('|') && trimmed.length > 2;
+
+    if (isTableRow) {
+      if (!inTable) {
+        if (resultLines.length > 0 && resultLines[resultLines.length - 1].trim() !== '') {
+          resultLines.push('');
+        }
+        inTable = true;
+      }
+      resultLines.push(trimmed);
+    } else {
+      if (inTable) {
+        if (trimmed !== '') {
+          resultLines.push('');
+        }
+        inTable = false;
+      }
+      resultLines.push(lines[i]);
+    }
+  }
+  sanitized = resultLines.join('\n');
 
   // 6. 소제목(### ) 앞뒤 빈 줄 확보로 마크다운 헤더 파싱 안정화
   sanitized = sanitized.replace(/([^\n])\n(###\s)/g, '$1\n\n$2');
