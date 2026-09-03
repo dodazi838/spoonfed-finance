@@ -150,7 +150,7 @@ export default function Home() {
   const [tocData, setTocData] = useState<TocData | null>(null);
   const [selectedChapters, setSelectedChapters] = useState<string[]>([]);
   const [reportData, setReportData] = useState<ReportData | null>(null);
-  const [selectedModel] = useState<string>('gemini-3.7-flash');
+  const [selectedModel] = useState<string>('gemini-3.8-flash');
   const [dailyTokens, setDailyTokens] = useState<number>(0);
   const [isClient, setIsClient] = useState(false);
   const [theme, setTheme] = useState<'dark' | 'light'>('dark');
@@ -709,9 +709,9 @@ export default function Home() {
       />
 
       {/* 우측 하단 버전 표시 배지 */}
-      <div className={styles.versionBadge} title="SPOONFED FINANCE v1.3.0 (2026.08.26)">
+      <div className={styles.versionBadge} title="SPOONFED FINANCE v1.4.0 (2026.09.03)">
         <span className={styles.versionDot}></span>
-        <span>v1.3.0</span>
+        <span>v1.4.0</span>
       </div>
     </main>
   );

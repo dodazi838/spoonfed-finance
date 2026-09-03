@@ -10,7 +10,7 @@ export const maxDuration = 300;
 export async function POST(req: NextRequest) {
   try {
     const { fileUri, mimeType, chapterTitle, modelName } = await req.json();
-    const selectedModel = modelName || 'gemini-3.7-flash';
+    const selectedModel = modelName || 'gemini-3.8-flash';
 
     if (!fileUri || !chapterTitle) {
       return NextResponse.json({ error: 'fileUri and chapterTitle are required' }, { status: 400 });

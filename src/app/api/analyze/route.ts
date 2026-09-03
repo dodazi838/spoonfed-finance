@@ -19,7 +19,7 @@ export async function POST(req: NextRequest) {
     let fileUri = '';
     let mimeType = 'application/pdf';
     let numPages = 15;
-    let selectedModel = 'gemini-3.7-flash';
+    let selectedModel = 'gemini-3.8-flash';
 
     // ─── A. 청크 업로드 완료 후 fileUri로 호출된 경우 (대용량 지원) ───
     if (contentType.includes('application/json')) {
@@ -27,7 +27,7 @@ export async function POST(req: NextRequest) {
       fileUri = body.fileUri;
       mimeType = body.mimeType || 'application/pdf';
       numPages = body.numPages || 15;
-      selectedModel = body.modelName || 'gemini-3.7-flash';
+      selectedModel = body.modelName || 'gemini-3.8-flash';
 
       if (!fileUri) {
         return NextResponse.json({ error: 'fileUri가 누락되었습니다.' }, { status: 400 });
@@ -37,7 +37,7 @@ export async function POST(req: NextRequest) {
     else if (contentType.includes('multipart/form-data')) {
       const formData = await req.formData();
       const file = formData.get('file') as File;
-      selectedModel = (formData.get('modelName') as string) || 'gemini-3.7-flash';
+      selectedModel = (formData.get('modelName') as string) || 'gemini-3.8-flash';
 
       if (!file) {
         return NextResponse.json({ error: 'No file provided' }, { status: 400 });
