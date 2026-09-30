@@ -4,6 +4,10 @@ export interface SourceChapter {
   title: string; startPage: number; endPage: number; startHeading: string; endHeading?: string;
 }
 
+function displayHeading(text: string): string {
+  return text.replace(/\s+/g, ' ').replace(/(\d)\s+(년|월|일)(?=\s|$)/g, '$1$2').trim();
+}
+
 /** Conservative structural fallback: sequential Roman roots, then numbered appendices.
  * Roman headings inside an appendix remain children of that appendix. */
 export function extractSourceChapters(source: SourceEvidence): SourceChapter[] {
@@ -19,7 +23,7 @@ export function extractSourceChapters(source: SourceEvidence): SourceChapter[] {
       if (appendix) {
         const body = appendix[3] || lines.slice(index + 1).find(line => line.trim() && !/^-\s*\d+\s*-$/.test(line.trim()))?.trim();
         if (!body || headings.some(h => h.title.startsWith(`${appendix[1]} ${appendix[2]} ·`))) continue;
-        headings.push({ title: `${appendix[1]} ${appendix[2]} · ${body}`, page: page.page, anchor });
+        headings.push({ title: `${appendix[1]} ${appendix[2]} · ${displayHeading(body)}`, page: page.page, anchor });
         inAppendix = true;
         continue;
       }
@@ -28,7 +32,7 @@ export function extractSourceChapters(source: SourceEvidence): SourceChapter[] {
       if (!roman) continue;
       const number = romanNumbers.indexOf(roman[1]) + 1;
       if (number !== lastRoman + 1) continue;
-      headings.push({ title: roman[2].trim(), page: page.page, anchor });
+      headings.push({ title: displayHeading(roman[2]), page: page.page, anchor });
       lastRoman = number;
     }
   }

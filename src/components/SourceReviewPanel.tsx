@@ -1,5 +1,5 @@
 'use client';
-import { findSourceConflicts, type SourceReview } from '@/lib/source-review';
+import { findSourceConflicts, formatSourceValue, type SourceReview } from '@/lib/source-review';
 import styles from './SourceReviewPanel.module.css';
 
 export default function SourceReviewPanel({ reviews }: { reviews: { label: string; review?: SourceReview }[] }) {
@@ -20,12 +20,12 @@ export default function SourceReviewPanel({ reviews }: { reviews: { label: strin
         {conflicts.map((group, index) => <div className={styles.warning} key={index}>
           <strong>수치 충돌 · {group[0].metric} ({group[0].period})</strong>
           <p>{group[0].scope} · {group[0].basis}. 어느 값이 맞는지는 원문 확인이 필요합니다.</p>
-          <ul>{group.map((fact, i) => <li key={i}>PDF {fact.sourcePage}쪽 · {fact.value?.toLocaleString()} {fact.unit}<blockquote>{fact.quote}</blockquote></li>)}</ul>
+          <ul>{group.map((fact, i) => <li key={i}>PDF {fact.sourcePage}쪽 · {formatSourceValue(fact.value)} {fact.unit}<blockquote>{fact.quote}</blockquote></li>)}</ul>
         </div>)}
         {available.map(({ label, review }) => <details className={styles.group} key={label}>
           <summary>{label} · 근거 {review!.facts.length}개</summary>
           <ul>{review!.facts.map((fact, index) => <li key={index}>
-            <strong>{fact.metric} · {fact.period} · {fact.value === null ? '결측' : fact.value.toLocaleString()} {fact.unit}</strong>
+            <strong>{fact.metric} · {fact.period} · {formatSourceValue(fact.value)} {fact.unit}</strong>
             <p>PDF {fact.sourcePage || '?'}쪽 · {fact.scope} · {fact.basis} · {fact.check === 'matched' ? '인용 일치' : fact.check === 'quote-missing' ? '인용문 대조 필요' : fact.check === 'number-missing' ? '수치 대조 필요' : '텍스트 근거 없음'}</p>
             <blockquote>{fact.quote || '인용문 없음'}</blockquote>
           </li>)}</ul>

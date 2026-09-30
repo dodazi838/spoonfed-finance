@@ -54,7 +54,7 @@ function frequency(row: Record<string, unknown>): string {
   if (/분기|[1-4]\s*\/\s*4|Q[1-4]|[1-4]Q/i.test(name)) return 'quarter';
   if (/\d{4}-\d{2}-\d{2}|일$|\d{1,2}\.\d{1,2}\.\d{1,2}/.test(name)) return 'day';
   if (/월|^\d{2,4}[.\/-]\d{1,2}$/.test(name)) return 'month';
-  if (/^\d{2,4}년?$/.test(name)) return 'year';
+  if (/연간|연말|년말|^\d{2,4}년?$/.test(name)) return 'year';
   return 'category';
 }
 
@@ -88,7 +88,7 @@ export function prepareCharts(chart: QualityChart): QualityChart[] {
     const kind = frequency(row);
     periods.set(kind, [...(periods.get(kind) || []), row]);
   }
-  const splitPeriods = periods.size > 1 && (chart.type === 'line' || chart.type === 'area');
+  const splitPeriods = periods.size > 1 && chart.type !== 'pie';
   const result: QualityChart[] = [];
   for (const group of groups.values()) {
     const slices = splitPeriods ? [...periods] : [['', data] as const];

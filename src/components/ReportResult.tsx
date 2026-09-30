@@ -358,7 +358,7 @@ ${sanitizeMarkdownText(section.easyExplanation || '')}
       contentStyle: { backgroundColor: '#fff', border: '1px solid #e2e8f0', borderRadius: '8px' },
       formatter: (value: unknown, name: unknown) => [value === null ? '결측' : `${value} ${chart.unit || ''}`, String(name)],
     };
-    const margin = { top: 30, right: 15, left: 0, bottom: data.length > 5 ? 30 : 0 };
+    const margin = { top: 30, right: 45, left: 0, bottom: data.length > 5 ? 30 : 0 };
     const axes = <>
       <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
       <XAxis {...xAxisProps} />

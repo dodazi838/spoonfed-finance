@@ -43,6 +43,14 @@ const sourceReview = load('src/lib/source-review.ts');
 const qualityFixture = require('./fixtures/china-report-quality.json');
 const sourceChapters = load('src/lib/source-chapters.ts');
 
+test('evidence values retain four-decimal reserve precision and small nonzero values', () => {
+  assert.equal(sourceReview.formatSourceValue(3.4383), '3.4383');
+  assert.equal(sourceReview.formatSourceValue(3.4188), '3.4188');
+  assert.equal(sourceReview.formatSourceValue(0.0004), '0.0004');
+  assert.equal(sourceReview.formatSourceValue(34383), '34,383');
+  assert.equal(sourceReview.formatSourceValue(null), '결측');
+});
+
 test('actual PDF hierarchy keeps Roman children and reference boxes within numbered appendices', () => {
   const source = { status: 'available', numPages: 17, pages: qualityFixture.structuralPages };
   const chapters = sourceChapters.extractSourceChapters(source);
@@ -67,6 +75,20 @@ test('source qualifiers do not hide conflicts and spaced table quotes retain num
   const first = { ...reserveFact(34383, 3, ''), metric: '외환보유액 (본문 3페이지 및 17페이지 표)', check: 'matched' };
   const second = { ...reserveFact(34188, 16, ''), metric: '외환보유액 (본문 16페이지 텍스트)', check: 'matched' };
   assert.equal(sourceReview.findSourceConflicts([{ facts: [first, second] }]).length, 1);
+  const quote = '2026 년 자금규모는 약 8 천억 위안';
+  assert.equal(sourceReview.validateSourceReview({ facts: [{ ...reserveFact(8000, 1, quote), unit: '억 위안' }] }, { status: 'available', pages: [{ page: 1, text: quote }] }).facts[0].check, 'matched');
+});
+
+test('API replaces lower-level model chapters with source headings and records scope boundaries', async () => {
+  const handler = routeLoader(async () => modelResponse(JSON.stringify({ summary: [], implications: '', chapters: ['Wrong child heading'] })))('src/app/api/analyze/route.ts').POST;
+  const response = await handler(request('analyze', { fileUri: 'temporary-file', numPages: 17, sourceEvidence: { status: 'available', pages: qualityFixture.structuralPages } }));
+  const body = await response.json();
+  assert.equal(body.chapters.length, 4);
+  assert.deepEqual(body.chapterRanges.map(range => range.startPage), [1, 3, 8, 17]);
+  assert.deepEqual(body.trace.parsedOutput.chapters, ['Wrong child heading']);
+  assert.deepEqual(body.trace.output.chapters, body.chapters);
+  assert.ok(body.trace.transformations.some(message => message.includes('목차')));
+  assert.ok(body.trace.prompt.text.includes('원문에서 확인한 대제목 구조'));
 });
 
 test('selected chapters follow source order regardless of click order or duplicate selection', () => {
@@ -119,6 +141,9 @@ test('statistical bases separate, unknown units are explicit and negative pies b
   const unknown = layout.prepareCharts({ title: 'Unknown', unit: '%, 억 달러', dataKeys: ['A', 'B'], data: [{ name: 'X', A: 1, B: 20 }] });
   assert.ok(unknown.every(chart => chart.unit.includes('확인 필요')));
   assert.equal(layout.prepareCharts({ title: 'Negative', type: 'pie', unit: '억 달러', data: [{ name: '유출', value: -290 }] })[0].type, 'bar');
+  const periods = layout.prepareCharts({ title: 'Balances', type: 'bar', unit: '조 위안', data: [{ name: '24년 연간', value: 1 }, { name: '25년 1/4', value: 2 }, { name: '25년 8월', value: 3 }] });
+  assert.equal(periods.length, 3);
+  assert.ok(periods.some(chart => chart.title.includes('연간')));
 });
 
 function reserveFact(value, sourcePage, quote) {

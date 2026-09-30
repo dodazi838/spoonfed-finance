@@ -13,6 +13,10 @@ export interface SourceReview {
   extractionStatus: SourceEvidence['status'];
 }
 
+export function formatSourceValue(value: number | null): string {
+  return value === null ? '결측' : value.toLocaleString('ko-KR', { maximumFractionDigits: 20 });
+}
+
 export function normalizeSourceEvidence(input: unknown): SourceEvidence {
   const raw = input as Partial<SourceEvidence> | undefined;
   let budget = 300000;
@@ -57,6 +61,10 @@ export function validateSourceReview(input: unknown, source: SourceEvidence): So
         const inEok = Number(match[1].replace(/,/g, '')) * 10000 + Number(match[2].replace(/,/g, ''));
         return fact.unit.startsWith('억') ? inEok : fact.unit.startsWith('조') ? inEok / 10000 : NaN;
       });
+      for (const match of normalizedQuote(fact.quote).matchAll(/(\d[\d,]*(?:\.\d+)?)천억/g)) {
+        const inEok = Number(match[1].replace(/,/g, '')) * 1000;
+        composite.push(fact.unit.startsWith('억') ? inEok : fact.unit.startsWith('조') ? inEok / 10000 : NaN);
+      }
       if (![...numbers.map(n => Number(n.replace(/,/g, ''))), ...composite].some(value => Math.abs(value - fact.value!) < 1e-9)) fact.check = 'number-missing';
     }
     facts.push(fact);
