@@ -1,12 +1,13 @@
 {
   "name": "spoonfed-finance",
-  "version": "1.4.4",
+  "version": "1.5.0",
   "private": true,
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "test:traces": "node --test --test-isolation=none scripts/test-analysis-traces.cjs"
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",

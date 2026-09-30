@@ -1,0 +1,15 @@
+.panel { width: 100%; max-width: 900px; border: 1px solid var(--panel-border); border-radius: 12px; background: var(--panel-bg); color: var(--text-main); }
+.panel summary { padding: 1rem 1.25rem; cursor: pointer; font-weight: 600; }
+.count { margin-left: .5rem; font-size: .8rem; color: var(--text-sub); font-weight: 400; }
+.body { padding: 0 1.25rem 1.25rem; font-size: .875rem; }
+.row { display: flex; flex-wrap: wrap; gap: .6rem; align-items: center; }
+.id { overflow-wrap: anywhere; user-select: all; }
+.body button { border: 1px solid var(--panel-border); background: var(--nav-btn-bg); color: var(--text-main); border-radius: 6px; padding: .5rem .7rem; cursor: pointer; font: inherit; }
+.body button:disabled { opacity: .5; cursor: default; }
+.status, .hint { color: var(--text-sub); line-height: 1.6; }
+.call { border-top: 1px solid var(--panel-border); padding: .8rem 0; display: flex; flex-direction: column; gap: .4rem; }
+.call small { color: var(--text-sub); overflow-wrap: anywhere; }
+.call p { margin: 0; line-height: 1.5; }
+.warning { color: var(--primary); }
+.feedback { border-top: 1px solid var(--panel-border); padding-top: .8rem; display: flex; flex-direction: column; align-items: flex-start; gap: .6rem; }
+.feedback textarea { width: 100%; min-height: 80px; padding: .7rem; color: var(--text-main); background: var(--bg-page); border: 1px solid var(--panel-border); border-radius: 6px; font: inherit; resize: vertical; }

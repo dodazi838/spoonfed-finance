@@ -15,6 +15,7 @@ import rehypeRaw from 'rehype-raw';
 import { marked } from 'marked';
 import html2canvas from 'html2canvas';
 import styles from './ReportResult.module.css';
+import AnalysisTracePanel from './AnalysisTracePanel';
 
 // Corporate Light Theme Colors (e.g., Deep Blue, Teal, Amber, Navy, Purple, Rose)
 const COLORS = ['#2563eb', '#0f766e', '#f59e0b', '#0369a1', '#6d28d9', '#be123c'];
@@ -154,6 +155,7 @@ export interface SectionAnalysis {
 }
 
 export interface ReportData {
+  analysisId?: string;
   summary: string[];
   chapters?: string[];
   sections: SectionAnalysis[];
@@ -161,6 +163,20 @@ export interface ReportData {
   fileUri?: string;
   mimeType?: string;
   usage?: TokenUsage; // Usage from the initial analyze request
+}
+
+export function snapshotReportForTrace(data: ReportData) {
+  // Persist the actual displayed Markdown separately from the server's parsed data.
+  const { fileUri: _fileUri, mimeType: _mimeType, ...result } = data;
+  return { result, displayedMarkdown: {
+    summary: data.summary?.map(item => sanitizeMarkdownText(item)),
+    implications: sanitizeMarkdownText(`💡 ${data.implications}`),
+    sections: data.sections?.map(section => ({
+      title: section.title,
+      easyExplanation: sanitizeMarkdownText(section.easyExplanation || ''),
+      chartDescriptions: section.charts?.map(chart => sanitizeMarkdownText(`💡 ${chart.description}`)),
+    })),
+  } };
 }
 
 export default function ReportResult({
@@ -486,6 +502,7 @@ ${sanitizeMarkdownText(section.easyExplanation || '')}
 
   return (
     <div className={`${styles.container} animate-fade-in`}>
+      <AnalysisTracePanel analysisId={data.analysisId} {...snapshotReportForTrace(data)} />
       
       {/* 서고 저장 상태 상단 배너 */}
       <div className={styles.topArchiveBanner}>

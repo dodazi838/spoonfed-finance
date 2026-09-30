@@ -1,17 +1,22 @@
 'use client';
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { UploadCloud, FileText, Loader2, AlertCircle, CheckSquare, Square, Sparkles, BookOpen, LogIn, LogOut, BookmarkCheck, Sun, Moon } from 'lucide-react';
 import styles from './page.module.css';
-import ReportResult, { ReportData, SectionAnalysis } from '@/components/ReportResult';
+import ReportResult, { ReportData, SectionAnalysis, snapshotReportForTrace } from '@/components/ReportResult';
 import { useAuth } from '@/lib/auth-context';
 import ArchiveDrawer from '@/components/ArchiveDrawer';
 import { saveReportToArchive, syncLocalReportsToCloud } from '@/lib/archive-service';
+import AnalysisTracePanel from '@/components/AnalysisTracePanel';
+import { captureAnalysisCall, saveAnalysisSession, sha256, loadAnalysisSession } from '@/lib/analysis-trace-store';
+import { TRACE_SCHEMA_VERSION, type AnalysisSession } from '@/lib/analysis-trace-types';
+import { version } from '../../package.json';
 
 // ─── 타입 정의 ───
 type Step = 'upload' | 'select' | 'analyze';
 
 interface TocData {
+  analysisId?: string;
   summary: string[];
   chapters: string[];
   implications: string;
@@ -28,7 +33,7 @@ function checkIsShortReport(data: TocData | null): boolean {
 }
 
 // ─── PDF 페이지 수 빠른 카운트 헬퍼 ───
-async function countPdfPages(file: File): Promise<number> {
+async function countPdfPages(file: File): Promise<{ numPages: number; method: string }> {
   try {
     const arrayBuffer = await file.arrayBuffer();
     const bytes = new Uint8Array(arrayBuffer);
@@ -37,19 +42,19 @@ async function countPdfPages(file: File): Promise<number> {
     // 1. /Type /Page 매칭 (/Pages 제외)
     const pageMatches = text.match(/\/Type\s*\/Page\b/g);
     if (pageMatches && pageMatches.length > 0) {
-      return pageMatches.length;
+      return { numPages: pageMatches.length, method: 'pdf-page-marker-count' };
     }
     
     // 2. /Count 숫자 검색
     const countMatch = text.match(/\/Count\s+(\d+)/);
     if (countMatch && countMatch[1]) {
       const parsed = parseInt(countMatch[1], 10);
-      if (parsed > 0 && parsed < 10000) return parsed;
+      if (parsed > 0 && parsed < 10000) return { numPages: parsed, method: 'pdf-count-marker' };
     }
   } catch (e) {
     console.warn('PDF 페이지 수 감지 실패, 기본값(15) 사용:', e);
   }
-  return 15;
+  return { numPages: 15, method: 'fallback-15' };
 }
 
 // ─── 청크 분할 업로드 함수 ───
@@ -151,6 +156,8 @@ export default function Home() {
   const [tocData, setTocData] = useState<TocData | null>(null);
   const [selectedChapters, setSelectedChapters] = useState<string[]>([]);
   const [reportData, setReportData] = useState<ReportData | null>(null);
+  const activeTrace = useRef<AnalysisSession | null>(null);
+  const [activeAnalysisId, setActiveAnalysisId] = useState<string>();
   const [selectedModel] = useState<string>('gemini-3.8-flash');
   const [dailyTokens, setDailyTokens] = useState<number>(0);
   const [isClient, setIsClient] = useState(false);
@@ -199,6 +206,7 @@ export default function Home() {
   useEffect(() => {
     if (user?.uid) {
       syncLocalReportsToCloud(user.uid).catch(err => console.warn('Sync local reports failed:', err));
+      if (activeTrace.current) void saveAnalysisSession(activeTrace.current, user.uid);
       if (reportData) {
         const currentFileName = file?.name || '금융_경제_리포트.pdf';
         saveReportToArchive(user.uid, currentFileName, reportData, checkIsShortReport(tocData))
@@ -280,10 +288,24 @@ export default function Home() {
     setReportData(null);
     setTocData(null);
     setSelectedChapters([]);
+    setIsSavedToArchive(false);
+    const session: AnalysisSession = {
+      schemaVersion: TRACE_SCHEMA_VERSION, analysisId: crypto.randomUUID(), createdAt: new Date().toISOString(),
+      ownerId: user?.uid,
+      input: { fileName: selectedFile.name, fileSize: selectedFile.size },
+      selectedChapters: [], calls: [], clientEvents: [],
+    };
+    activeTrace.current = session;
+    setActiveAnalysisId(session.analysisId);
     
     try {
       // 1. PDF 페이지 수 확인
-      const numPages = await countPdfPages(selectedFile);
+      const { numPages, method } = await countPdfPages(selectedFile);
+      session.input.numPages = numPages;
+      session.input.pageCountMethod = method;
+      try { session.input.fileSha256 = await sha256(await selectedFile.arrayBuffer()); }
+      catch { session.clientEvents.push({ at: new Date().toISOString(), stage: 'fingerprint', message: '파일 해시를 계산하지 못했습니다.' }); }
+      await saveAnalysisSession(session, user?.uid);
 
       // 2. 청크 분할 릴레이 업로드 실행
       const { fileUri, mimeType } = await uploadPdfInChunks(selectedFile, (_percent, statusText) => {
@@ -294,7 +316,7 @@ export default function Home() {
       setUploadProgressText('AI가 보고서 핵심 목차 및 내용을 심층 스캔 중입니다...');
       const response = await fetch('/api/analyze', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'x-analysis-id': session.analysisId },
         body: JSON.stringify({
           fileUri,
           mimeType,
@@ -310,6 +332,11 @@ export default function Home() {
       } catch {
         throw new Error(`서버 응답 오류: ${responseText.slice(0, 100)}`);
       }
+      await captureAnalysisCall(session, data.trace, user?.uid);
+      if (!data.trace) {
+        session.clientEvents.push({ at: new Date().toISOString(), stage: 'analyze', message: `서버가 추적 기록을 반환하지 않았습니다. HTTP ${response.status}` });
+        await saveAnalysisSession(session, user?.uid);
+      }
 
       if (!response.ok) {
         throw new Error(data.error || '리포트 요약 중 오류가 발생했습니다.');
@@ -321,6 +348,7 @@ export default function Home() {
 
       if (data.isShortReport === true || data.isShortReport === 'true') {
         const initialData: ReportData = {
+          analysisId: session.analysisId,
           summary: data.summary || [],
           implications: data.implications || '',
           sections: data.sections || [],
@@ -328,6 +356,8 @@ export default function Home() {
         };
         setReportData(initialData);
         setStep('analyze');
+        Object.assign(session, snapshotReportForTrace(initialData), { displayVersion: version });
+        await saveAnalysisSession(session, user?.uid);
 
         // 서고(로컬 + 클라우드)에 자동 저장
         saveReportToArchive(user?.uid, selectedFile.name, initialData, true)
@@ -336,10 +366,19 @@ export default function Home() {
       } else {
         setTocData(data);
         setStep('select');
+        // Retain the summary-stage report even if the user closes before choosing chapters.
+        void saveReportToArchive(user?.uid, selectedFile.name, {
+          analysisId: session.analysisId, summary: data.summary || [], implications: data.implications || '', sections: [],
+        }, false).catch(() => {});
       }
       
       setIsUploading(false);
     } catch (err: any) {
+      session.clientEvents.push({ at: new Date().toISOString(), stage: 'upload-or-analyze', message: '업로드 또는 전체 분석 요청에 실패했습니다.' });
+      await saveAnalysisSession(session, user?.uid);
+      void saveReportToArchive(user?.uid, selectedFile.name, {
+        analysisId: session.analysisId, summary: ['분석을 완료하지 못했습니다. 분석 기록에서 오류를 확인해 주세요.'], implications: '', sections: [],
+      }).catch(() => {});
       setError(err.message || '알 수 없는 오류가 발생했습니다.');
       setFile(null);
       setIsUploading(false);
@@ -367,6 +406,11 @@ export default function Home() {
 
     setStep('analyze');
     setError(null);
+    const session = activeTrace.current;
+    if (session) {
+      session.selectedChapters = [...selectedChapters];
+      await saveAnalysisSession(session, user?.uid);
+    }
 
     const initialSections: SectionAnalysis[] = selectedChapters.map((chapterTitle: string) => ({
       title: chapterTitle,
@@ -374,6 +418,7 @@ export default function Home() {
     }));
 
     const initialData: ReportData = {
+      analysisId: tocData?.analysisId || session?.analysisId,
       summary: tocData?.summary || [],
       implications: tocData?.implications || '',
       sections: initialSections,
@@ -391,7 +436,7 @@ export default function Home() {
       try {
         const chapterRes = await fetch('/api/analyze-chapter', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', ...(session ? { 'x-analysis-id': session.analysisId } : {}) },
           body: JSON.stringify({
             fileUri: tocData?.fileUri,
             mimeType: tocData?.mimeType,
@@ -407,6 +452,11 @@ export default function Home() {
           chapterData = JSON.parse(chapterText);
         } catch {
           chapterData = { error: `서버 응답 오류: ${chapterText.slice(0, 100)}` };
+        }
+        if (session) await captureAnalysisCall(session, chapterData.trace, user?.uid);
+        if (session && !chapterData.trace) {
+          session.clientEvents.push({ at: new Date().toISOString(), stage: 'analyze-chapter', message: `${chapterTitle}: 서버가 추적 기록을 반환하지 않았습니다. HTTP ${chapterRes.status}` });
+          await saveAnalysisSession(session, user?.uid);
         }
         
         if (chapterData.usage?.totalTokenCount) {
@@ -431,6 +481,10 @@ export default function Home() {
 
         setReportData(prev => prev ? { ...prev, sections: [...completedSections] } : prev);
       } catch (e: any) {
+        if (session) {
+          session.clientEvents.push({ at: new Date().toISOString(), stage: 'analyze-chapter', message: `${chapterTitle} 챕터 요청에 실패했습니다.` });
+          await saveAnalysisSession(session, user?.uid);
+        }
         console.error('Failed to fetch chapter:', e);
         completedSections[i] = {
           title: chapterTitle,
@@ -444,6 +498,7 @@ export default function Home() {
 
     // 모든 챕터 분석 완료 후 최종 리포트 데이터 구성 및 서고(로컬 + 클라우드) 자동 저장
     const finalReport: ReportData = {
+      analysisId: tocData?.analysisId || session?.analysisId,
       summary: tocData?.summary || [],
       implications: tocData?.implications || '',
       sections: completedSections,
@@ -451,6 +506,13 @@ export default function Home() {
       mimeType: tocData?.mimeType,
     };
     setReportData(finalReport);
+    if (session) {
+      // Keep a saved feedback note when the in-progress session reference is older.
+      const latest = await loadAnalysisSession(session.analysisId, user?.uid);
+      session.feedback = latest?.feedback;
+      Object.assign(session, snapshotReportForTrace(finalReport), { displayVersion: version });
+      await saveAnalysisSession(session, user?.uid);
+    }
 
     const currentFileName = file?.name || '금융_경제_리포트.pdf';
     saveReportToArchive(user?.uid, currentFileName, finalReport, false)
@@ -462,6 +524,8 @@ export default function Home() {
     setReportData(null);
     setFile(null);
     setStep('upload');
+    activeTrace.current = null;
+    setActiveAnalysisId(undefined);
     setTocData(null);
     setSelectedChapters([]);
     setError(null);
@@ -543,6 +607,7 @@ export default function Home() {
           )}
         </div>
       </nav>
+      {step !== 'analyze' && activeAnalysisId && <AnalysisTracePanel analysisId={activeAnalysisId} />}
       
       <section className={`${styles.hero} animate-fade-in`}>
         <div className={styles.badge}>FINANCIAL REPORT INTELLIGENCE</div>
@@ -722,6 +787,8 @@ export default function Home() {
         onClose={() => setIsArchiveOpen(false)}
         userId={user?.uid}
         onSelectReport={(archivedData, fileName) => {
+          activeTrace.current = null;
+          setActiveAnalysisId(archivedData.analysisId);
           setFile(new File([], fileName));
           setReportData(archivedData);
           setStep('analyze');
@@ -730,9 +797,9 @@ export default function Home() {
       />
 
       {/* 우측 하단 버전 표시 배지 */}
-      <div className={styles.versionBadge} title="SPOONFED FINANCE v1.4.4 (2026.09.03)">
+      <div className={styles.versionBadge} title={`SPOONFED FINANCE v${version}`}>
         <span className={styles.versionDot}></span>
-        <span>v1.4.4</span>
+        <span>v{version}</span>
       </div>
     </main>
   );

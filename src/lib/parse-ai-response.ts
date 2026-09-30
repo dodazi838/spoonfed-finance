@@ -1,10 +1,16 @@
 /**
  * AI 응답에서 JSON을 안전하게 추출하는 3중 폴백 파서
  */
-export function parseAIResponse(responseText: string): { success: true; data: any } | { success: false; error: string } {
+import type { ParseDiagnostics, ParseMethod } from './analysis-trace-types';
+
+export function parseAIResponse(responseText: string): ({ success: true; data: any } | { success: false; error: string }) & { diagnostics: ParseDiagnostics } {
+  const diagnostics = (method: ParseMethod): ParseDiagnostics => ({
+    method, recovered: method !== 'direct',
+    warnings: method === 'partial-recovery' ? ['불완전한 응답에서 본문만 복구했습니다. 차트는 복구하지 못했습니다.'] : method === 'failed' ? ['JSON 파싱에 실패했습니다.'] : method !== 'direct' ? ['AI 응답의 JSON 형식을 보정했습니다.'] : [],
+  });
   // 1차: 그대로 파싱 시도
   try {
-    return { success: true, data: JSON.parse(responseText) };
+    return { success: true, data: JSON.parse(responseText), diagnostics: diagnostics('direct') };
   } catch {
     // continue to fallback
   }
@@ -13,7 +19,7 @@ export function parseAIResponse(responseText: string): { success: true; data: an
   try {
     const codeBlockMatch = responseText.match(/```(?:json)?\s*([\s\S]*?)```/);
     if (codeBlockMatch) {
-      return { success: true, data: JSON.parse(codeBlockMatch[1].trim()) };
+      return { success: true, data: JSON.parse(codeBlockMatch[1].trim()), diagnostics: diagnostics('code-block') };
     }
   } catch {
     // continue to fallback
@@ -24,7 +30,7 @@ export function parseAIResponse(responseText: string): { success: true; data: an
     const firstBrace = responseText.indexOf('{');
     const lastBrace = responseText.lastIndexOf('}');
     if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
-      return { success: true, data: JSON.parse(responseText.substring(firstBrace, lastBrace + 1)) };
+      return { success: true, data: JSON.parse(responseText.substring(firstBrace, lastBrace + 1)), diagnostics: diagnostics('brace-extraction') };
     }
   } catch {
     // continue to fallback
@@ -49,6 +55,7 @@ export function parseAIResponse(responseText: string): { success: true; data: an
 
       return {
         success: true,
+        diagnostics: diagnostics('partial-recovery'),
         data: {
           title: titleMatch ? unescape(titleMatch[1]) : "분석 내용",
           // 끝에 미완성된 표를 억지로 지우는 정규식 제거 (오히려 정상적인 표까지 모두 날려버리는 부작용 발생)
@@ -61,5 +68,5 @@ export function parseAIResponse(responseText: string): { success: true; data: an
     // continue to fallback
   }
 
-  return { success: false, error: responseText.substring(0, 500) };
+  return { success: false, error: responseText.substring(0, 500), diagnostics: diagnostics('failed') };
 }

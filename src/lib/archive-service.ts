@@ -10,8 +10,10 @@ import {
 } from 'firebase/firestore';
 import { db } from './firebase';
 import { ReportData } from '@/components/ReportResult';
+import { deleteAnalysisSession, loadAnalysisSession, saveAnalysisSession } from './analysis-trace-store';
 
 export interface ArchivedReport {
+  analysisId?: string;
   id: string;
   userId: string;
   fileName: string;
@@ -82,7 +84,7 @@ export async function saveReportToArchive(
   reportData: ReportData,
   isShortReport: boolean = false
 ): Promise<string> {
-  const reportId = `${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+  const reportId = reportData.analysisId || `${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
   const title = fileName.replace(/\.[^/.]+$/, '') || '금융 경제 리포트';
 
   // 차트 개수 및 챕터 개수 계산
@@ -112,6 +114,7 @@ export async function saveReportToArchive(
   }));
 
   const archivedReport: ArchivedReport = {
+    ...(reportData.analysisId ? { analysisId: reportData.analysisId } : {}),
     id: reportId,
     userId: userId || 'local_user',
     fileName,
@@ -177,6 +180,7 @@ export async function getUserReports(userId?: string): Promise<ArchivedReport[]>
       }
 
       cloudReports.push({
+        ...(data.analysisId ? { analysisId: data.analysisId } : {}),
         id: docSnap.id,
         userId: data.userId || userId,
         fileName: data.fileName || 'document.pdf',
@@ -210,7 +214,8 @@ export async function getUserReports(userId?: string): Promise<ArchivedReport[]>
 /**
  * 서고 보고서 삭제 (로컬 + 클라우드 동시 삭제)
  */
-export async function deleteReportFromArchive(userId: string | undefined, reportId: string): Promise<void> {
+export async function deleteReportFromArchive(userId: string | undefined, reportId: string, analysisId?: string): Promise<void> {
+  if (analysisId) await deleteAnalysisSession(analysisId, userId);
   // 로컬 삭제
   deleteLocalReport(reportId);
 
@@ -243,6 +248,10 @@ export async function syncLocalReportsToCloud(userId: string): Promise<void> {
       }));
       sanitized.createdAt = serverTimestamp();
       await setDoc(reportRef, sanitized, { merge: true });
+      if (report.analysisId) {
+        const trace = await loadAnalysisSession(report.analysisId, userId);
+        if (trace) await saveAnalysisSession(trace, userId);
+      }
     } catch (e) {
       console.warn(`Failed to sync report ${report.id} to cloud:`, e);
     }

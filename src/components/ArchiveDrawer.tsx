@@ -49,7 +49,7 @@ export default function ArchiveDrawer({
 
     setDeletingId(reportId);
     try {
-      await deleteReportFromArchive(userId, reportId);
+      await deleteReportFromArchive(userId, reportId, reports.find(report => report.id === reportId)?.analysisId);
       setReports(prev => prev.filter(r => r.id !== reportId));
     } catch (e) {
       console.error('Failed to delete report:', e);
@@ -61,6 +61,7 @@ export default function ArchiveDrawer({
 
   const handleOpenReport = (report: ArchivedReport) => {
     const reportData: ReportData = {
+      analysisId: report.analysisId,
       summary: report.summary || [],
       implications: report.implications || '',
       sections: report.sections || [],
@@ -74,8 +75,9 @@ export default function ArchiveDrawer({
     const query = searchQuery.toLowerCase();
     const matchTitle = (r.title || '').toLowerCase().includes(query);
     const matchFile = (r.fileName || '').toLowerCase().includes(query);
+    const matchAnalysisId = (r.analysisId || '').toLowerCase().includes(query);
     const matchSummary = (r.summary || []).some(s => s.toLowerCase().includes(query));
-    return matchTitle || matchFile || matchSummary;
+    return matchTitle || matchFile || matchSummary || matchAnalysisId;
   });
 
   const formatDate = (timestamp: number) => {
@@ -108,7 +110,7 @@ export default function ArchiveDrawer({
           <input
             type="text"
             className={styles.searchInput}
-            placeholder="보고서 제목, 요약 키워드 검색..."
+            placeholder="보고서 제목, 요약 키워드, 분석 ID 검색..."
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
           />
