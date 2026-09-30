@@ -16,6 +16,9 @@ import { marked } from 'marked';
 import html2canvas from 'html2canvas';
 import styles from './ReportResult.module.css';
 import AnalysisTracePanel from './AnalysisTracePanel';
+import SourceReviewPanel from './SourceReviewPanel';
+import { splitLongBullets, prepareCharts, chartDomain, type QualityChart } from '@/lib/report-layout';
+import type { SourceReview } from '@/lib/source-review';
 
 // Corporate Light Theme Colors (e.g., Deep Blue, Teal, Amber, Navy, Purple, Rose)
 const COLORS = ['#2563eb', '#0f766e', '#f59e0b', '#0369a1', '#6d28d9', '#be123c'];
@@ -125,10 +128,10 @@ export function sanitizeMarkdownText(text: any): string {
   // 7. 3개 이상 연속된 개행을 깔끔한 단락 개행(\n\n)으로 정돈
   sanitized = sanitized.replace(/\n{3,}/g, '\n\n');
 
-  return sanitized;
+  return splitLongBullets(sanitized);
 }
 
-export interface ChartData {
+export interface ChartData extends QualityChart {
   title: string;
   validation_thought?: string;
   type?: 'bar' | 'line' | 'pie' | 'area';
@@ -147,6 +150,7 @@ export interface TokenUsage {
 }
 
 export interface SectionAnalysis {
+  sourceReview?: SourceReview;
   title: string;
   easyExplanation?: string;
   charts?: ChartData[];
@@ -155,6 +159,7 @@ export interface SectionAnalysis {
 }
 
 export interface ReportData {
+  sourceReview?: SourceReview;
   analysisId?: string;
   summary: string[];
   chapters?: string[];
@@ -175,6 +180,7 @@ export function snapshotReportForTrace(data: ReportData) {
       title: section.title,
       easyExplanation: sanitizeMarkdownText(section.easyExplanation || ''),
       chartDescriptions: section.charts?.map(chart => sanitizeMarkdownText(`💡 ${chart.description}`)),
+      charts: section.charts?.flatMap(prepareCharts),
     })),
   } };
 }
@@ -337,172 +343,52 @@ ${sanitizeMarkdownText(section.easyExplanation || '')}
     }
   };
 
-  // ─── 스마트 Y축 도메인 계산 ───
-  // 데이터의 실제 범위에 맞춰 Y축을 자동으로 조정합니다.
-  // 예: 국채금리 3.8~4.5% → Y축을 0~5% 대신 3.5~4.8% 로 좁혀서 미세한 움직임이 보이게 합니다.
-  const calcYDomain = (data: any[], dataKeys: string[]): [number | string, number | string] => {
-    const allValues = data.flatMap(d => dataKeys.map(k => Number(d[k])).filter(v => !isNaN(v)));
-    if (allValues.length === 0) return [0, 'auto'];
-    
-    const min = Math.min(...allValues);
-    const max = Math.max(...allValues);
-    const range = max - min;
-    
-    // 데이터가 0 근처에서 시작하는 경우(예: 비율 0~30%)는 0부터 시작하는 게 자연스러움
-    if (min >= 0 && min < range * 0.3) return [0, 'auto'];
-    
-    // 그 외(예: 금리 3.8~4.5%, 주가 5000~5500)는 데이터 범위에 10% 여유를 두고 조정
-    const padding = range * 0.1 || Math.abs(min) * 0.05;
-    const floorMin = Math.floor((min - padding) * 10) / 10;
-    return [Math.max(0, floorMin), Math.ceil((max + padding) * 10) / 10];
-  };
-
-  // ─── 이중 Y축(Dual Axis) 필요 여부 판단 ───
-  // 두 시리즈의 스케일 차이가 3배 이상이면 이중 Y축을 사용합니다.
-  // 예: 나스닥(16000) vs S&P(5400) → 좌측 Y축: S&P, 우측 Y축: 나스닥
-  const needsDualAxis = (data: any[], dataKeys: string[]): boolean => {
-    if (dataKeys.length < 2) return false;
-    const averages = dataKeys.map(key => {
-      const vals = data.map(d => Math.abs(Number(d[key]))).filter(v => !isNaN(v) && v !== 0);
-      return vals.length > 0 ? vals.reduce((a, b) => a + b, 0) / vals.length : 0;
-    });
-    const maxAvg = Math.max(...averages);
-    const minAvg = Math.min(...averages.filter(v => v > 0));
-    return minAvg > 0 && maxAvg / minAvg >= 3;
-  };
-
-  // 개별 시리즈의 Y축 도메인 계산 (이중 축용)
-  const calcSingleKeyDomain = (data: any[], key: string): [number | string, number | string] => {
-    return calcYDomain(data, [key]);
-  };
-
-  const renderChart = (chart: ChartData) => {
+  // prepareCharts groups by unit, statistical basis and period before rendering.
+  const renderChart = (chart: QualityChart) => {
+    const keys = chart.dataKeys?.length ? chart.dataKeys : ['value'];
+    const data = chart.data;
     const type = chart.type || 'bar';
-    const keys = chart.dataKeys || ['value'];
-    const dualAxis = (type === 'line' || type === 'area') && needsDualAxis(chart.data, keys);
-    
-    // 공통 XAxis 속성
     const xAxisProps = {
-      dataKey: "name" as const,
-      stroke: "#64748b",
-      tick: { fill: '#64748b', fontSize: 12 },
-      axisLine: false,
-      tickLine: false,
-      interval: 0 as any,
-      angle: chart.data.length > 5 ? -45 : 0,
-      textAnchor: (chart.data.length > 5 ? 'end' : 'middle') as any,
-      height: chart.data.length > 5 ? 60 : 30,
+      dataKey: 'name', stroke: '#64748b', tick: { fill: '#64748b', fontSize: 12 },
+      axisLine: false, tickLine: false, interval: 0,
+      angle: data.length > 5 ? -45 : 0, textAnchor: data.length > 5 ? 'end' as const : 'middle' as const,
+      height: data.length > 5 ? 60 : 30,
     };
-    
-    // 공통 Tooltip 속성
     const tooltipProps = {
-      contentStyle: { backgroundColor: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '8px', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' },
-      itemStyle: { fontWeight: 'bold' as const },
+      contentStyle: { backgroundColor: '#fff', border: '1px solid #e2e8f0', borderRadius: '8px' },
+      formatter: (value: unknown, name: unknown) => [value === null ? '결측' : `${value} ${chart.unit || ''}`, String(name)],
     };
-
-    switch (type) {
-      case 'line': {
-        const yDomain = dualAxis ? undefined : calcYDomain(chart.data, keys);
-        return (
-          <LineChart data={chart.data} margin={{ top: 30, right: dualAxis ? 20 : 10, left: -20, bottom: chart.data.length > 5 ? 30 : 0 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
-            <XAxis {...xAxisProps} />
-            {dualAxis ? (
-              <>
-                <YAxis yAxisId="left" stroke={chart.colors?.[0] || COLORS[0]} tick={{ fill: chart.colors?.[0] || COLORS[0], fontSize: 11 }} axisLine={false} tickLine={false} domain={calcSingleKeyDomain(chart.data, keys[0])} />
-                <YAxis yAxisId="right" orientation="right" stroke={chart.colors?.[1] || COLORS[1]} tick={{ fill: chart.colors?.[1] || COLORS[1], fontSize: 11 }} axisLine={false} tickLine={false} domain={calcSingleKeyDomain(chart.data, keys[1])} />
-              </>
-            ) : (
-              <YAxis stroke="#64748b" tick={{ fill: '#64748b' }} axisLine={false} tickLine={false} domain={yDomain} />
-            )}
-            <Tooltip {...tooltipProps} cursor={{ fill: 'rgba(0,0,0,0.05)' }} />
-            {keys.length > 1 && <Legend verticalAlign="top" height={36} iconType="circle" />}
-            {keys.map((key, idx) => {
-              const color = chart.colors?.[idx] || COLORS[idx % COLORS.length];
-              return (
-                <Line key={key} type="monotone" dataKey={key} name={key === 'value' ? '수치' : key} stroke={color} strokeWidth={3} dot={{ r: 4, fill: color, strokeWidth: 2 }} activeDot={{ r: 6 }} isAnimationActive={false} yAxisId={dualAxis ? (idx === 0 ? 'left' : 'right') : undefined} />
-              );
-            })}
-          </LineChart>
-        );
-      }
-      case 'pie': {
-        const pieKey = keys[0] || 'value';
-        return (
-          <PieChart margin={{ top: 10, right: 10, left: 10, bottom: 10 }}>
-            <Tooltip {...tooltipProps} />
-            <Pie
-              data={chart.data}
-              cx="50%"
-              cy="50%"
-              innerRadius={60}
-              outerRadius={80}
-              paddingAngle={5}
-              dataKey={pieKey}
-              nameKey="name"
-              label={({ name, percent }) => `${name} ${((percent || 0) * 100).toFixed(0)}%`}
-              labelLine={false}
-              isAnimationActive={false}
-            >
-              {chart.data.map((entry, index) => (
-                <Cell key={`cell-${index}`} fill={chart.colors?.[index] || COLORS[index % COLORS.length]} />
-              ))}
-            </Pie>
-          </PieChart>
-        );
-      }
-      case 'area': {
-        const yDomain = dualAxis ? undefined : calcYDomain(chart.data, keys);
-        return (
-          <AreaChart data={chart.data} margin={{ top: 30, right: dualAxis ? 20 : 10, left: -20, bottom: chart.data.length > 5 ? 30 : 0 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
-            <XAxis {...xAxisProps} />
-            {dualAxis ? (
-              <>
-                <YAxis yAxisId="left" stroke={chart.colors?.[0] || COLORS[0]} tick={{ fill: chart.colors?.[0] || COLORS[0], fontSize: 11 }} axisLine={false} tickLine={false} domain={calcSingleKeyDomain(chart.data, keys[0])} />
-                <YAxis yAxisId="right" orientation="right" stroke={chart.colors?.[1] || COLORS[1]} tick={{ fill: chart.colors?.[1] || COLORS[1], fontSize: 11 }} axisLine={false} tickLine={false} domain={calcSingleKeyDomain(chart.data, keys[1])} />
-              </>
-            ) : (
-              <YAxis stroke="#64748b" tick={{ fill: '#64748b' }} axisLine={false} tickLine={false} domain={yDomain} />
-            )}
-            <Tooltip {...tooltipProps} cursor={{ fill: 'rgba(0,0,0,0.05)' }} />
-            {keys.length > 1 && <Legend verticalAlign="top" height={36} iconType="circle" />}
-            {keys.map((key, idx) => {
-              const color = chart.colors?.[idx] || COLORS[idx % COLORS.length];
-              return (
-                <Area key={key} type="monotone" dataKey={key} name={key === 'value' ? '수치' : key} stroke={color} fillOpacity={0.15} fill={color} isAnimationActive={false} yAxisId={dualAxis ? (idx === 0 ? 'left' : 'right') : undefined} />
-              );
-            })}
-          </AreaChart>
-        );
-      }
-      case 'bar':
-      default: {
-        const yDomain = calcYDomain(chart.data, keys);
-        return (
-          <BarChart data={chart.data} margin={{ top: 30, right: 10, left: -20, bottom: chart.data.length > 5 ? 30 : 0 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
-            <XAxis {...xAxisProps} />
-            <YAxis stroke="#64748b" tick={{ fill: '#64748b' }} axisLine={false} tickLine={false} domain={yDomain} />
-            <Tooltip {...tooltipProps} cursor={{ fill: 'rgba(0,0,0,0.05)' }} />
-            {keys.length > 1 && <Legend verticalAlign="top" height={36} iconType="circle" />}
-            {keys.map((key, idx) => {
-              const color = chart.colors?.[idx] || COLORS[idx % COLORS.length];
-              return (
-                <Bar key={key} dataKey={key} name={key === 'value' ? '수치' : key} fill={color} radius={[4, 4, 0, 0]} barSize={keys.length > 1 ? 25 : 45} isAnimationActive={false} minPointSize={3}>
-                  {keys.length === 1 && <LabelList dataKey={key} position="top" fill="#475569" fontSize={12} fontWeight={600} />}
-                </Bar>
-              );
-            })}
-          </BarChart>
-        );
-      }
+    const margin = { top: 30, right: 15, left: 0, bottom: data.length > 5 ? 30 : 0 };
+    const axes = <>
+      <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
+      <XAxis {...xAxisProps} />
+      <YAxis stroke="#64748b" tick={{ fill: '#64748b', fontSize: 11 }} axisLine={false} tickLine={false} domain={chartDomain(data, keys, type === 'bar')} width={65} />
+      <Tooltip {...tooltipProps} />
+      {keys.length > 1 && <Legend verticalAlign="top" height={36} iconType="circle" />}
+    </>;
+    if (type === 'pie') {
+      const values = data.filter(row => typeof row[keys[0]] === 'number');
+      return <PieChart><Tooltip {...tooltipProps} /><Pie data={values} dataKey={keys[0]} nameKey="name" cx="50%" cy="50%" innerRadius={60} outerRadius={80} paddingAngle={5} isAnimationActive={false} label={({ name, percent }) => `${name} ${((percent || 0) * 100).toFixed(0)}%`}>
+        {values.map((_, index) => <Cell key={index} fill={chart.colors?.[index] || COLORS[index % COLORS.length]} />)}
+      </Pie></PieChart>;
     }
+    if (type === 'line') return <LineChart data={data} margin={margin}>{axes}{keys.map((key, index) =>
+      <Line key={key} type="linear" dataKey={key} name={key === 'value' ? '수치' : key} stroke={chart.colors?.[index] || COLORS[index % COLORS.length]} strokeWidth={3} dot={{ r: 4 }} connectNulls={false} isAnimationActive={false} />
+    )}</LineChart>;
+    if (type === 'area') return <AreaChart data={data} margin={margin}>{axes}{keys.map((key, index) =>
+      <Area key={key} type="linear" dataKey={key} name={key === 'value' ? '수치' : key} stroke={chart.colors?.[index] || COLORS[index % COLORS.length]} fill={chart.colors?.[index] || COLORS[index % COLORS.length]} fillOpacity={0.15} connectNulls={false} isAnimationActive={false} />
+    )}</AreaChart>;
+    return <BarChart data={data} margin={margin}>{axes}{keys.map((key, index) =>
+      <Bar key={key} dataKey={key} name={key === 'value' ? '수치' : key} fill={chart.colors?.[index] || COLORS[index % COLORS.length]} isAnimationActive={false} barSize={keys.length > 1 ? 25 : 45}>
+        {keys.length === 1 && <LabelList dataKey={key} position="top" fill="#475569" fontSize={12} />}
+      </Bar>
+    )}</BarChart>;
   };
 
   return (
     <div className={`${styles.container} animate-fade-in`}>
       <AnalysisTracePanel analysisId={data.analysisId} {...snapshotReportForTrace(data)} />
+      <SourceReviewPanel reviews={[{ label: '보고서 요약', review: data.sourceReview }, ...data.sections.map(section => ({ label: section.title, review: section.sourceReview }))]} />
       
       {/* 서고 저장 상태 상단 배너 */}
       <div className={styles.topArchiveBanner}>
@@ -589,7 +475,7 @@ ${sanitizeMarkdownText(section.easyExplanation || '')}
                 {/* 해당 섹션의 차트들 (Capture-Friendly Layout + Multi-Series) */}
                 {section.charts && section.charts.length > 0 && (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginTop: '1rem' }}>
-                    {section.charts.map((chart, chartIdx) => (
+                    {section.charts.flatMap(prepareCharts).map((chart, chartIdx) => (
                       <div key={chartIdx} className={styles.chartCard} id={`chart-${idx}-${chartIdx}`}>
                         <div className={styles.chartHeader} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                           <div>
@@ -613,6 +499,7 @@ ${sanitizeMarkdownText(section.easyExplanation || '')}
                             {renderChart(chart)}
                           </ResponsiveContainer>
                         </div>
+                        {!!chart.notes?.length && <ul style={{ color: '#92400e', fontSize: '0.9rem', paddingLeft: '1.2rem' }}>{chart.notes.map((note, noteIdx) => <li key={noteIdx}>{note}</li>)}</ul>}
                         
                         {chart.description && (
                           <div className={styles.chartDescription}>

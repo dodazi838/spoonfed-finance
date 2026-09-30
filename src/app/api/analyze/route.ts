@@ -3,7 +3,8 @@ import { GoogleAIFileManager } from '@google/generative-ai/server';
 import fs from 'fs/promises';
 import path from 'path';
 import os from 'os';
-import pdfParse from 'pdf-parse';
+import { extractPdfSource } from '@/lib/pdf-source';
+import { normalizeSourceEvidence, sourceEvidencePrompt, validateSourceReview } from '@/lib/source-review';
 
 import { createModel } from '@/lib/gemini';
 import { buildShortReportPrompt, buildLongReportPrompt } from '@/lib/prompt-builder';
@@ -22,6 +23,7 @@ export async function POST(req: NextRequest) {
     let mimeType = 'application/pdf';
     let numPages = 15;
     let selectedModel = 'gemini-3.8-flash';
+    let sourceEvidence = normalizeSourceEvidence(undefined);
 
     // ─── A. 청크 업로드 완료 후 fileUri로 호출된 경우 (대용량 지원) ───
     if (contentType.includes('application/json')) {
@@ -30,6 +32,8 @@ export async function POST(req: NextRequest) {
       mimeType = body.mimeType || 'application/pdf';
       numPages = body.numPages || 15;
       selectedModel = body.modelName || 'gemini-3.8-flash';
+      sourceEvidence = normalizeSourceEvidence(body.sourceEvidence);
+      if (sourceEvidence.numPages) numPages = sourceEvidence.numPages;
       trace.model.requested = selectedModel;
 
       if (!fileUri) {
@@ -62,8 +66,8 @@ export async function POST(req: NextRequest) {
         displayName: file.name,
       });
 
-      const pdfData = await pdfParse(buffer);
-      numPages = pdfData.numpages;
+      sourceEvidence = await extractPdfSource(buffer);
+      numPages = sourceEvidence.numPages || numPages;
       fileUri = uploadResult.file.uri;
       mimeType = uploadResult.file.mimeType;
 
@@ -77,9 +81,9 @@ export async function POST(req: NextRequest) {
     trace.input = { numPages, mode: isShortReport ? 'short' : 'long' };
     trace.model = { requested: selectedModel, temperature: 0.1, maxOutputTokens: maxTokens };
     const model = createModel(selectedModel, maxTokens);
-    const prompt = isShortReport
+    const prompt = (isShortReport
       ? buildShortReportPrompt(numPages)
-      : buildLongReportPrompt(numPages);
+      : buildLongReportPrompt(numPages)) + sourceEvidencePrompt(sourceEvidence);
     setTracePrompt(trace, prompt);
 
     // Gemini API 호출 (선택된 모델로만 3회 자동 재시도)
@@ -112,6 +116,11 @@ export async function POST(req: NextRequest) {
 
     const parsedData = parsed.data;
     trace.parsedOutput = JSON.parse(JSON.stringify(parsedData));
+    parsedData.sourceReview = validateSourceReview(parsedData.sourceReview, sourceEvidence);
+    if (Array.isArray(parsedData.sections)) parsedData.sections = parsedData.sections.map((section: any) => ({
+      ...section, sourceReview: validateSourceReview(section.sourceReview, sourceEvidence),
+    }));
+    trace.transformations.push('인용문·수치를 추출된 PDF 텍스트와 대조하고 근거 점검 결과를 추가했습니다.');
     
     // 짧은 보고서의 경우 AI가 chapters를 반환하지 않고 sections만 반환하므로, UI 호환성을 위해 chapters를 생성해줍니다.
     if (parsedData.sections && !parsedData.chapters) {

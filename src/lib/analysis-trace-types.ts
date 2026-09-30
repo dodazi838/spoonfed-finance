@@ -1,5 +1,5 @@
 export const TRACE_SCHEMA_VERSION = 1;
-export const PROMPT_VERSION = '2026-09-30.1';
+export const PROMPT_VERSION = '2026-09-30.2';
 
 export type ParseMethod = 'direct' | 'code-block' | 'brace-extraction' | 'partial-recovery' | 'failed';
 export interface ParseDiagnostics {
@@ -33,6 +33,7 @@ export interface AnalysisCallTrace {
 }
 
 export interface AnalysisSession {
+  sourceEvidence?: import('./source-review').SourceEvidence;
   schemaVersion: number;
   analysisId: string;
   createdAt: string;

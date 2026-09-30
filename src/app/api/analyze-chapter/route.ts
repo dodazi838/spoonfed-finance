@@ -5,13 +5,15 @@ import { buildChapterPrompt } from '@/lib/prompt-builder';
 import { parseAIResponse } from '@/lib/parse-ai-response';
 import { handleApiError, callWithRetry } from '@/lib/error-handler';
 import { createAnalysisTrace, finishTrace, setTracePrompt, traceAttempt } from '@/lib/analysis-trace-server';
+import { normalizeSourceEvidence, sourceEvidencePrompt, validateSourceReview } from '@/lib/source-review';
 
 export const maxDuration = 300;
 
 export async function POST(req: NextRequest) {
   const trace = createAnalysisTrace('analyze-chapter', req.headers.get('x-analysis-id'));
   try {
-    const { fileUri, mimeType, chapterTitle, modelName } = await req.json();
+    const { fileUri, mimeType, chapterTitle, modelName, sourceEvidence: rawSource } = await req.json();
+    const sourceEvidence = normalizeSourceEvidence(rawSource);
     const selectedModel = modelName || 'gemini-3.8-flash';
     trace.input = { chapterTitle };
     trace.model = { requested: selectedModel, temperature: 0.1, maxOutputTokens: 16384 };
@@ -21,7 +23,7 @@ export async function POST(req: NextRequest) {
     }
 
     const model = createModel(selectedModel, 16384);
-    const prompt = buildChapterPrompt(chapterTitle);
+    const prompt = buildChapterPrompt(chapterTitle) + sourceEvidencePrompt(sourceEvidence);
     setTracePrompt(trace, prompt);
 
     // Gemini API 호출 (선택된 모델로만 3회 자동 재시도)
@@ -72,9 +74,11 @@ export async function POST(req: NextRequest) {
       title: parsed.data.title || chapterTitle,
       easyExplanation,
       charts: parsed.data.charts || [],
+      sourceReview: validateSourceReview(parsed.data.sourceReview, sourceEvidence),
       usage,
       analysisId: trace.analysisId,
     };
+    trace.transformations.push('인용문·수치를 추출된 PDF 텍스트와 대조하고 근거 점검 결과를 추가했습니다.');
     return NextResponse.json({ ...output, trace: finishTrace(trace, output) });
 
   } catch (e: any) {

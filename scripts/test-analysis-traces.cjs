@@ -38,6 +38,121 @@ function loader(stubs = {}) {
 const load = loader();
 const { parseAIResponse } = load('src/lib/parse-ai-response.ts');
 const { createAnalysisTrace, traceAttempt, setTracePrompt, finishTrace } = load('src/lib/analysis-trace-server.ts');
+const layout = load('src/lib/report-layout.ts');
+const sourceReview = load('src/lib/source-review.ts');
+const qualityFixture = require('./fixtures/china-report-quality.json');
+
+test('selected chapters follow source order regardless of click order or duplicate selection', () => {
+  assert.deepEqual(layout.chaptersInReportOrder(['1. A', '2. B', '3. C', '4. D'], ['4. D', '1. A', '3. C', '4. D', 'unknown']), ['1. A', '3. C', '4. D']);
+});
+
+test('long bullets keep their text, decimals, emphasis and list nesting when paragraphs split', async () => {
+  const first = '**지표**: ' + '첫 문장의 원문 근거를 유지합니다. '.repeat(5);
+  const second = '전월 4.3%에서 0.4%로 하락하였습니다. ' + '추가 설명을 유지합니다. '.repeat(5);
+  const input = `- ${first}${second}\n\n| 구분 | 수치 |\n| --- | --- |\n| 음수 | -7.2 |`;
+  const output = layout.splitLongBullets(input);
+  assert.ok(output.includes('\n\n  '));
+  assert.equal(output.replace(/\s/g, ''), input.replace(/\s/g, ''));
+  assert.match(output, /4\.3%에서 0\.4%/);
+  const { marked } = await import('marked');
+  const html = await marked.parse(output);
+  assert.equal((html.match(/<li>/g) || []).length, 1);
+  assert.ok((html.match(/<p>/g) || []).length >= 2);
+  assert.ok(html.includes('<table>'));
+  assert.equal(layout.splitLongBullets('```\n' + input + '\n```'), '```\n' + input + '\n```');
+});
+
+test('actual trade regression splits percentage vs dollars and quarterly vs monthly rows', () => {
+  const prepared = layout.prepareCharts(qualityFixture.tradeChart);
+  assert.equal(prepared.length, 4);
+  const rates = prepared.filter(chart => chart.unit === '%');
+  const amounts = prepared.filter(chart => chart.unit === '억 달러');
+  assert.equal(rates.length, 2);
+  assert.equal(amounts.length, 2);
+  for (const chart of rates) assert.deepEqual(chart.dataKeys, ['수출증가율', '수입증가율']);
+  for (const chart of amounts) assert.deepEqual(chart.dataKeys, ['무역수지']);
+  assert.ok(prepared.find(chart => chart.title.includes('월간')).data.every(row => row.name.includes('월')));
+  assert.ok(prepared.find(chart => chart.title.includes('분기')).data.every(row => row.name.includes('/4')));
+  assert.deepEqual(prepared.flatMap(chart => chart.data).filter(row => row.name === '26년 8월')[0], qualityFixture.tradeChart.data.at(-1));
+});
+
+test('negative-only domains retain negatives and missing values never become zero', () => {
+  assert.ok(layout.chartDomain([{ x: -7.2 }, { x: -6.7 }], ['x'])[0] < -7.2);
+  assert.deepEqual(layout.chartDomain([{ x: null }, { x: '-' }], ['x']), [0, 1]);
+  assert.ok(layout.chartDomain([{ x: -290 }], ['x'], true)[1] === 0);
+  const [chart] = layout.prepareCharts({ title: 'Missing', unit: '%', dataKeys: ['x'], data: [{ name: 'A', x: null }, { name: 'B', x: '-' }, { name: 'C', x: 0 }, { name: 'D', x: '-7.2' }] });
+  assert.deepEqual(chart.data.map(row => row.x), [null, null, 0, -7.2]);
+  assert.ok(chart.notes.some(note => note.includes('결측')));
+});
+
+test('statistical bases separate, unknown units are explicit and negative pies become bars', () => {
+  const charts = layout.prepareCharts({ title: 'Basis', type: 'line', unit: '%', dataKeys: ['A', 'B'], series: [{ key: 'A', unit: '%', basis: '전년 동월 대비' }, { key: 'B', unit: '%', basis: '누계 전년 대비' }], data: [{ name: '8월', A: 1, B: -1 }] });
+  assert.equal(charts.length, 2);
+  assert.notEqual(charts[0].title, charts[1].title);
+  const unknown = layout.prepareCharts({ title: 'Unknown', unit: '%, 억 달러', dataKeys: ['A', 'B'], data: [{ name: 'X', A: 1, B: 20 }] });
+  assert.ok(unknown.every(chart => chart.unit.includes('확인 필요')));
+  assert.equal(layout.prepareCharts({ title: 'Negative', type: 'pie', unit: '억 달러', data: [{ name: '유출', value: -290 }] })[0].type, 'bar');
+});
+
+function reserveFact(value, sourcePage, quote) {
+  return { metric: '외환보유액', period: '2026-08', scope: '중국', basis: '기말 잔액', unit: '억 달러', value, sourcePage, quote };
+}
+
+test('actual source inconsistency flags both pages without selecting a canonical value', () => {
+  const source = sourceReview.normalizeSourceEvidence({ status: 'available', numPages: 17, pages: qualityFixture.sourcePages });
+  const review = sourceReview.validateSourceReview({ facts: [reserveFact(34383, 3, qualityFixture.quotes[0]), reserveFact(34188, 16, qualityFixture.quotes[1])] }, source);
+  assert.deepEqual(review.facts.map(fact => fact.check), ['matched', 'matched']);
+  const conflicts = sourceReview.findSourceConflicts([review]);
+  assert.equal(conflicts.length, 1);
+  assert.deepEqual(conflicts[0].map(fact => fact.sourcePage), [3, 16]);
+  assert.deepEqual(conflicts[0].map(fact => fact.value), [34383, 34188]);
+});
+
+test('wrong citations and wrong numbers fail; different scopes and periods never conflict', () => {
+  const source = sourceReview.normalizeSourceEvidence({ status: 'available', pages: qualityFixture.sourcePages });
+  const review = sourceReview.validateSourceReview({ facts: [reserveFact(34383, 16, qualityFixture.quotes[0]), reserveFact(99999, 3, qualityFixture.quotes[0]), reserveFact(34188, 99, qualityFixture.quotes[1])] }, source);
+  assert.deepEqual(review.facts.map(fact => fact.check), ['quote-missing', 'number-missing', 'unavailable']);
+  assert.equal(sourceReview.findSourceConflicts([review]).length, 0);
+  const base = reserveFact(600, 5, '신규 대출 600억 위안');
+  const cases = [{ ...base, value: 552, scope: '사회융자총액 내 위안화 대출' }, { ...base, value: 552, period: '2026-07' }];
+  for (const different of cases) assert.equal(sourceReview.findSourceConflicts([{ facts: [{ ...base, check: 'matched' }, { ...different, check: 'matched' }] }]).length, 0);
+});
+
+test('missing or partial source extraction is bounded and never labeled fully available', () => {
+  assert.equal(sourceReview.normalizeSourceEvidence(undefined).status, 'unavailable');
+  const source = sourceReview.normalizeSourceEvidence({ status: 'available', pages: [{ page: 1, text: '가'.repeat(300001) }] });
+  assert.equal(source.status, 'partial');
+  assert.equal(source.pages[0].text.length, 300000);
+  assert.equal(sourceReview.validateSourceReview({}, source).extractionStatus, 'partial');
+});
+
+test('chapter API retains source review, validates it and preserves raw model output in trace', async () => {
+  const raw = { title: 'A', easyExplanation: 'Body', charts: [], sourceReview: { facts: [reserveFact(34383, 3, qualityFixture.quotes[0])] } };
+  const handler = routeLoader(async () => modelResponse(JSON.stringify(raw)))('src/app/api/analyze-chapter/route.ts').POST;
+  const response = await handler(request('analyze-chapter', { fileUri: 'temporary-file', chapterTitle: 'A', sourceEvidence: { status: 'available', pages: qualityFixture.sourcePages } }));
+  const body = await response.json();
+  assert.equal(body.sourceReview.facts[0].check, 'matched');
+  assert.equal(body.trace.parsedOutput.sourceReview.facts[0].check, undefined);
+  assert.equal(body.trace.output.sourceReview.facts[0].check, 'matched');
+  assert.ok(body.trace.prompt.text.includes('원문 자동 대조용 텍스트'));
+});
+
+test('archive round trip retains source review and chart series, notes, pages and nulls', async () => {
+  const records = new Map();
+  const previousStorage = global.localStorage;
+  global.localStorage = { getItem: key => records.get(key) || null, setItem: (key, value) => records.set(key, value) };
+  try {
+    const archive = loader({ './firebase': { db: null }, 'firebase/firestore': {} })('src/lib/archive-service.ts');
+    const review = sourceReview.validateSourceReview({ facts: [] }, { status: 'partial', pages: [] });
+    const chart = { title: 'Missing', type: 'line', series: [{ key: 'A', unit: '%', basis: '누계 전년 대비' }], notes: ['표본 제외'], sourcePages: [3], dataKeys: ['A'], data: [{ name: '8월', periodType: 'month', period: '2026-08', A: null }] };
+    const id = await archive.saveReportToArchive(undefined, 'Report.pdf', { analysisId: 'quality-archive', summary: [], implications: '', sourceReview: review, sections: [{ title: 'A', sourceReview: review, charts: [chart] }] });
+    const [stored] = await archive.getUserReports();
+    assert.equal(stored.id, id);
+    assert.deepEqual(stored.sourceReview, review);
+    assert.deepEqual(stored.sections[0].sourceReview, review);
+    for (const key of ['series', 'notes', 'sourcePages', 'data']) assert.deepEqual(stored.sections[0].charts[0][key], chart[key]);
+  } finally { global.localStorage = previousStorage; }
+});
 
 test('normal responses retain charts; formatting recovery is recorded', () => {
   const text = JSON.stringify({ title: 'Chapter', easyExplanation: 'Body', charts: [{ data: [{ value: -1 }] }] });

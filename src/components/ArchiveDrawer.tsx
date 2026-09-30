@@ -61,6 +61,7 @@ export default function ArchiveDrawer({
 
   const handleOpenReport = (report: ArchivedReport) => {
     const reportData: ReportData = {
+        sourceReview: report.sourceReview,
       analysisId: report.analysisId,
       summary: report.summary || [],
       implications: report.implications || '',

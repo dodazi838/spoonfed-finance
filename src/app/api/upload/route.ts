@@ -3,6 +3,7 @@ import { GoogleAIFileManager } from '@google/generative-ai/server';
 import fs from 'fs/promises';
 import path from 'path';
 import os from 'os';
+import { extractPdfSource } from '@/lib/pdf-source';
 
 export const maxDuration = 120;
 
@@ -41,7 +42,7 @@ export async function POST(req: NextRequest) {
       const mimeType = (formData.get('mimeType') as string) || 'application/pdf';
       const chunk = formData.get('chunk') as File;
 
-      if (!uploadId || !chunk) {
+      if (!uploadId || !/^\d+_[a-z0-9]+$/.test(uploadId) || !chunk) {
         return NextResponse.json(
           { error: '필수 파라미터(uploadId, chunk)가 누락되었습니다.' },
           { status: 400 }
@@ -64,6 +65,8 @@ export async function POST(req: NextRequest) {
             displayName: fileName,
           });
 
+          const sourceEvidence = await extractPdfSource(await fs.readFile(tempFilePath));
+
           // 임시 파일 정리
           await fs.unlink(tempFilePath).catch(console.error);
 
@@ -73,6 +76,7 @@ export async function POST(req: NextRequest) {
             fileUri: uploadResult.file.uri,
             mimeType: uploadResult.file.mimeType || mimeType,
             displayName: uploadResult.file.displayName,
+            sourceEvidence,
           });
         } catch (uploadErr: any) {
           await fs.unlink(tempFilePath).catch(console.error);

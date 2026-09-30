@@ -13,6 +13,7 @@ import { ReportData } from '@/components/ReportResult';
 import { deleteAnalysisSession, loadAnalysisSession, saveAnalysisSession } from './analysis-trace-store';
 
 export interface ArchivedReport {
+  sourceReview?: ReportData['sourceReview'];
   analysisId?: string;
   id: string;
   userId: string;
@@ -99,6 +100,7 @@ export async function saveReportToArchive(
 
   // Firestore & JSON 직렬화 시 undefined 값을 방지하기 위해 정제
   const cleanSections = sections.map((sec: any) => ({
+    ...(sec.sourceReview ? { sourceReview: sec.sourceReview } : {}),
     title: sec.title || '',
     easyExplanation: sec.easyExplanation || '',
     charts: (sec.charts || []).map((ch: any) => ({
@@ -110,10 +112,14 @@ export async function saveReportToArchive(
       dataKeys: ch.dataKeys || [],
       data: ch.data || [],
       description: ch.description || '',
+      series: ch.series || [],
+      notes: ch.notes || [],
+      sourcePages: ch.sourcePages || [],
     })),
   }));
 
   const archivedReport: ArchivedReport = {
+    ...(reportData.sourceReview ? { sourceReview: reportData.sourceReview } : {}),
     ...(reportData.analysisId ? { analysisId: reportData.analysisId } : {}),
     id: reportId,
     userId: userId || 'local_user',
@@ -180,6 +186,7 @@ export async function getUserReports(userId?: string): Promise<ArchivedReport[]>
       }
 
       cloudReports.push({
+        ...(data.sourceReview ? { sourceReview: data.sourceReview } : {}),
         ...(data.analysisId ? { analysisId: data.analysisId } : {}),
         id: docSnap.id,
         userId: data.userId || userId,

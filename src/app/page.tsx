@@ -11,11 +11,14 @@ import AnalysisTracePanel from '@/components/AnalysisTracePanel';
 import { captureAnalysisCall, saveAnalysisSession, sha256, loadAnalysisSession } from '@/lib/analysis-trace-store';
 import { TRACE_SCHEMA_VERSION, type AnalysisSession } from '@/lib/analysis-trace-types';
 import { version } from '../../package.json';
+import { chaptersInReportOrder } from '@/lib/report-layout';
+import { type SourceEvidence, type SourceReview } from '@/lib/source-review';
 
 // ─── 타입 정의 ───
 type Step = 'upload' | 'select' | 'analyze';
 
 interface TocData {
+  sourceReview?: SourceReview;
   analysisId?: string;
   summary: string[];
   chapters: string[];
@@ -61,7 +64,7 @@ async function countPdfPages(file: File): Promise<{ numPages: number; method: st
 async function uploadPdfInChunks(
   file: File,
   onProgress?: (percent: number, statusText: string) => void
-): Promise<{ fileUri: string; mimeType: string }> {
+): Promise<{ fileUri: string; mimeType: string; sourceEvidence?: SourceEvidence }> {
   const CHUNK_SIZE = 2.5 * 1024 * 1024; // 2.5MB (Vercel 4.5MB 한도 내 안전한 크기)
   const totalSize = file.size;
   const fileName = file.name;
@@ -130,6 +133,7 @@ async function uploadPdfInChunks(
       return {
         fileUri: chunkData.fileUri,
         mimeType: chunkData.mimeType || mimeType,
+        sourceEvidence: chunkData.sourceEvidence,
       };
     }
 
@@ -157,6 +161,7 @@ export default function Home() {
   const [selectedChapters, setSelectedChapters] = useState<string[]>([]);
   const [reportData, setReportData] = useState<ReportData | null>(null);
   const activeTrace = useRef<AnalysisSession | null>(null);
+  const sourceEvidence = useRef<SourceEvidence | undefined>(undefined);
   const [activeAnalysisId, setActiveAnalysisId] = useState<string>();
   const [selectedModel] = useState<string>('gemini-3.8-flash');
   const [dailyTokens, setDailyTokens] = useState<number>(0);
@@ -289,6 +294,7 @@ export default function Home() {
     setTocData(null);
     setSelectedChapters([]);
     setIsSavedToArchive(false);
+    sourceEvidence.current = undefined;
     const session: AnalysisSession = {
       schemaVersion: TRACE_SCHEMA_VERSION, analysisId: crypto.randomUUID(), createdAt: new Date().toISOString(),
       ownerId: user?.uid,
@@ -308,9 +314,20 @@ export default function Home() {
       await saveAnalysisSession(session, user?.uid);
 
       // 2. 청크 분할 릴레이 업로드 실행
-      const { fileUri, mimeType } = await uploadPdfInChunks(selectedFile, (_percent, statusText) => {
+      const uploaded = await uploadPdfInChunks(selectedFile, (_percent, statusText) => {
         setUploadProgressText(statusText);
       });
+      const { fileUri, mimeType } = uploaded;
+      if (uploaded.sourceEvidence?.fileSha256 && session.input.fileSha256 && uploaded.sourceEvidence.fileSha256 !== session.input.fileSha256) {
+        throw new Error('업로드한 PDF와 추출한 원문이 일치하지 않습니다. 파일을 다시 업로드해 주세요.');
+      }
+      sourceEvidence.current = uploaded.sourceEvidence;
+      session.sourceEvidence = uploaded.sourceEvidence;
+      if (uploaded.sourceEvidence?.numPages) {
+        session.input.numPages = uploaded.sourceEvidence.numPages;
+        session.input.pageCountMethod = 'server-pdf-parser';
+      }
+      await saveAnalysisSession(session, user?.uid);
 
       // 3. AI 분석 요청 (/api/analyze)
       setUploadProgressText('AI가 보고서 핵심 목차 및 내용을 심층 스캔 중입니다...');
@@ -320,7 +337,8 @@ export default function Home() {
         body: JSON.stringify({
           fileUri,
           mimeType,
-          numPages,
+          numPages: session.input.numPages,
+          sourceEvidence: uploaded.sourceEvidence,
           modelName: selectedModel,
         }),
       });
@@ -349,6 +367,7 @@ export default function Home() {
       if (data.isShortReport === true || data.isShortReport === 'true') {
         const initialData: ReportData = {
           analysisId: session.analysisId,
+          sourceReview: data.sourceReview,
           summary: data.summary || [],
           implications: data.implications || '',
           sections: data.sections || [],
@@ -369,6 +388,7 @@ export default function Home() {
         // Retain the summary-stage report even if the user closes before choosing chapters.
         void saveReportToArchive(user?.uid, selectedFile.name, {
           analysisId: session.analysisId, summary: data.summary || [], implications: data.implications || '', sections: [],
+          sourceReview: data.sourceReview,
         }, false).catch(() => {});
       }
       
@@ -406,13 +426,14 @@ export default function Home() {
 
     setStep('analyze');
     setError(null);
+    const orderedChapters = chaptersInReportOrder(tocData?.chapters || [], selectedChapters);
     const session = activeTrace.current;
     if (session) {
-      session.selectedChapters = [...selectedChapters];
+      session.selectedChapters = orderedChapters;
       await saveAnalysisSession(session, user?.uid);
     }
 
-    const initialSections: SectionAnalysis[] = selectedChapters.map((chapterTitle: string) => ({
+    const initialSections: SectionAnalysis[] = orderedChapters.map((chapterTitle: string) => ({
       title: chapterTitle,
       isLoading: true,
     }));
@@ -420,6 +441,7 @@ export default function Home() {
     const initialData: ReportData = {
       analysisId: tocData?.analysisId || session?.analysisId,
       summary: tocData?.summary || [],
+      sourceReview: tocData?.sourceReview,
       implications: tocData?.implications || '',
       sections: initialSections,
       fileUri: tocData?.fileUri,
@@ -430,8 +452,8 @@ export default function Home() {
 
     const completedSections = [...initialSections];
 
-    for (let i = 0; i < selectedChapters.length; i++) {
-      const chapterTitle = selectedChapters[i];
+    for (let i = 0; i < orderedChapters.length; i++) {
+      const chapterTitle = orderedChapters[i];
       
       try {
         const chapterRes = await fetch('/api/analyze-chapter', {
@@ -441,6 +463,7 @@ export default function Home() {
             fileUri: tocData?.fileUri,
             mimeType: tocData?.mimeType,
             chapterTitle: chapterTitle,
+            sourceEvidence: sourceEvidence.current,
             modelName: selectedModel
           })
         });
@@ -468,6 +491,7 @@ export default function Home() {
             title: chapterData.title || chapterTitle,
             easyExplanation: chapterData.easyExplanation,
             charts: chapterData.charts,
+            sourceReview: chapterData.sourceReview,
             isLoading: false,
           };
         } else {
@@ -502,6 +526,7 @@ export default function Home() {
       summary: tocData?.summary || [],
       implications: tocData?.implications || '',
       sections: completedSections,
+      sourceReview: tocData?.sourceReview,
       fileUri: tocData?.fileUri,
       mimeType: tocData?.mimeType,
     };
