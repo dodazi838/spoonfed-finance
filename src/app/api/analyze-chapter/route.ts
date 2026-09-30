@@ -6,6 +6,7 @@ import { parseAIResponse } from '@/lib/parse-ai-response';
 import { handleApiError, callWithRetry } from '@/lib/error-handler';
 import { createAnalysisTrace, finishTrace, setTracePrompt, traceAttempt } from '@/lib/analysis-trace-server';
 import { normalizeSourceEvidence, sourceEvidencePrompt, validateSourceReview } from '@/lib/source-review';
+import { extractSourceChapters, chapterSource, chapterScopePrompt } from '@/lib/source-chapters';
 
 export const maxDuration = 300;
 
@@ -14,16 +15,18 @@ export async function POST(req: NextRequest) {
   try {
     const { fileUri, mimeType, chapterTitle, modelName, sourceEvidence: rawSource } = await req.json();
     const sourceEvidence = normalizeSourceEvidence(rawSource);
+    const chapterRange = extractSourceChapters(sourceEvidence).find(chapter => chapter.title === chapterTitle);
+    const scopedSource = chapterSource(sourceEvidence, chapterRange);
     const selectedModel = modelName || 'gemini-3.8-flash';
-    trace.input = { chapterTitle };
-    trace.model = { requested: selectedModel, temperature: 0.1, maxOutputTokens: 16384 };
+    trace.input = { chapterTitle, ...(chapterRange ? { chapterRange } : {}) };
+    trace.model = { requested: selectedModel, temperature: 0.1, maxOutputTokens: 32768 };
 
     if (!fileUri || !chapterTitle) {
       return NextResponse.json({ error: 'fileUri and chapterTitle are required', analysisId: trace.analysisId, trace: finishTrace(trace, undefined, new Error('Missing chapter or file')) }, { status: 400 });
     }
 
-    const model = createModel(selectedModel, 16384);
-    const prompt = buildChapterPrompt(chapterTitle) + sourceEvidencePrompt(sourceEvidence);
+    const model = createModel(selectedModel, 32768);
+    const prompt = buildChapterPrompt(chapterTitle) + sourceEvidencePrompt(scopedSource) + chapterScopePrompt(chapterRange);
     setTracePrompt(trace, prompt);
 
     // Gemini API 호출 (선택된 모델로만 3회 자동 재시도)
@@ -74,7 +77,7 @@ export async function POST(req: NextRequest) {
       title: parsed.data.title || chapterTitle,
       easyExplanation,
       charts: parsed.data.charts || [],
-      sourceReview: validateSourceReview(parsed.data.sourceReview, sourceEvidence),
+      sourceReview: validateSourceReview(parsed.data.sourceReview, scopedSource),
       usage,
       analysisId: trace.analysisId,
     };

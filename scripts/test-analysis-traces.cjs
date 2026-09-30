@@ -41,6 +41,33 @@ const { createAnalysisTrace, traceAttempt, setTracePrompt, finishTrace } = load(
 const layout = load('src/lib/report-layout.ts');
 const sourceReview = load('src/lib/source-review.ts');
 const qualityFixture = require('./fixtures/china-report-quality.json');
+const sourceChapters = load('src/lib/source-chapters.ts');
+
+test('actual PDF hierarchy keeps Roman children and reference boxes within numbered appendices', () => {
+  const source = { status: 'available', numPages: 17, pages: qualityFixture.structuralPages };
+  const chapters = sourceChapters.extractSourceChapters(source);
+  assert.equal(chapters.length, 4);
+  assert.deepEqual(chapters.map(c => c.startPage), [1, 3, 8, 17]);
+  assert.match(chapters[2].title, /붙임 1/);
+  assert.match(chapters[3].title, /붙임 2/);
+  const recent = sourceChapters.chapterSource(source, chapters[0]);
+  assert.ok(!recent.pages.find(page => page.page === 3).text.includes('향후 전망'));
+  const outlook = sourceChapters.chapterSource(source, chapters[1]);
+  assert.ok(outlook.pages.some(page => page.page === 6 && page.text.includes('<참고>')));
+  const appendix = sourceChapters.chapterSource(source, chapters[2]);
+  assert.ok(appendix.pages.some(page => page.page === 13));
+  assert.ok(!appendix.pages.some(page => page.text.includes('<붙임 2>')));
+  assert.deepEqual(sourceChapters.extractSourceChapters({ ...source, status: 'partial' }), []);
+});
+
+test('source qualifiers do not hide conflicts and spaced table quotes retain numeric boundaries', () => {
+  const source = { status: 'available', pages: [{ page: 1, text: '증가율 7.3 8.5 4.3' }] };
+  const review = sourceReview.validateSourceReview({ facts: [{ ...reserveFact(4.3, 1, '증가율 7.3 8.5 4.3') }] }, source);
+  assert.equal(review.facts[0].check, 'matched');
+  const first = { ...reserveFact(34383, 3, ''), metric: '외환보유액 (본문 3페이지 및 17페이지 표)', check: 'matched' };
+  const second = { ...reserveFact(34188, 16, ''), metric: '외환보유액 (본문 16페이지 텍스트)', check: 'matched' };
+  assert.equal(sourceReview.findSourceConflicts([{ facts: [first, second] }]).length, 1);
+});
 
 test('selected chapters follow source order regardless of click order or duplicate selection', () => {
   assert.deepEqual(layout.chaptersInReportOrder(['1. A', '2. B', '3. C', '4. D'], ['4. D', '1. A', '3. C', '4. D', 'unknown']), ['1. A', '3. C', '4. D']);
@@ -210,7 +237,7 @@ function request(stage, body, analysisId = 'analysis-123') {
 
 test('short and long API branches capture exact prompts and output without file URI', async () => {
   const handler = routeLoader(async () => modelResponse('{"summary":["Summary"],"sections":[{"title":"A","charts":[]}]}'))('src/app/api/analyze/route.ts').POST;
-  for (const [pages, mode, limit] of [[5, 'short', 16384], [20, 'long', 8192]]) {
+  for (const [pages, mode, limit] of [[5, 'short', 32768], [20, 'long', 16384]]) {
     const response = await handler(request('analyze', { fileUri: 'temporary-file', numPages: pages }));
     assert.equal(response.status, 200);
     const body = await response.json();

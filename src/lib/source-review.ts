@@ -52,7 +52,7 @@ export function validateSourceReview(input: unknown, source: SourceEvidence): So
     const quote = normalizedQuote(fact.quote);
     fact.check = !page ? 'unavailable' : !quote || !normalizedQuote(page.text).includes(quote) ? 'quote-missing' : 'matched';
     if (fact.check === 'matched' && fact.value !== null) {
-      const numbers = normalizedQuote(fact.quote).match(/-?\d[\d,]*(?:\.\d+)?/g) || [];
+      const numbers = fact.quote.normalize('NFKC').replace(/[−–△]/g, '-').match(/-?\d[\d,]*(?:\.\d+)?/g) || [];
       const composite = [...normalizedQuote(fact.quote).matchAll(/(\d[\d,]*(?:\.\d+)?)조(\d[\d,]*(?:\.\d+)?)억/g)].map(match => {
         const inEok = Number(match[1].replace(/,/g, '')) * 10000 + Number(match[2].replace(/,/g, ''));
         return fact.unit.startsWith('억') ? inEok : fact.unit.startsWith('조') ? inEok / 10000 : NaN;
@@ -78,7 +78,8 @@ export function findSourceConflicts(reviews: (SourceReview | undefined)[]): Sour
   for (const review of reviews) for (const fact of review?.facts || []) {
     // Different definitions (e.g. bank loans vs social financing) must never be merged.
     if (fact.value === null || fact.check !== 'matched' || !fact.period || !fact.basis || !fact.scope || !fact.unit) continue;
-    const key = [fact.metric, fact.period, fact.basis, fact.scope, fact.unit].map(normalizedQuote).join('|');
+    const metric = fact.metric.replace(/\s*\([^)]*(?:페이지|본문|PDF|출처|쪽)[^)]*\)/gi, '');
+    const key = [metric, fact.period, fact.basis, fact.scope, fact.unit].map(normalizedQuote).join('|');
     const group = groups.get(key) || [];
     if (!group.some(f => f.value === fact.value && f.sourcePage === fact.sourcePage && f.quote === fact.quote)) group.push(fact);
     groups.set(key, group);

@@ -5,6 +5,7 @@ import path from 'path';
 import os from 'os';
 import { extractPdfSource } from '@/lib/pdf-source';
 import { normalizeSourceEvidence, sourceEvidencePrompt, validateSourceReview } from '@/lib/source-review';
+import { extractSourceChapters } from '@/lib/source-chapters';
 
 import { createModel } from '@/lib/gemini';
 import { buildShortReportPrompt, buildLongReportPrompt } from '@/lib/prompt-builder';
@@ -77,13 +78,15 @@ export async function POST(req: NextRequest) {
     }
 
     const isShortReport = numPages <= 10;
-    const maxTokens = isShortReport ? 16384 : 8192;
+    const maxTokens = isShortReport ? 32768 : 16384;
     trace.input = { numPages, mode: isShortReport ? 'short' : 'long' };
     trace.model = { requested: selectedModel, temperature: 0.1, maxOutputTokens: maxTokens };
     const model = createModel(selectedModel, maxTokens);
+    const sourceChapters = isShortReport ? [] : extractSourceChapters(sourceEvidence);
     const prompt = (isShortReport
       ? buildShortReportPrompt(numPages)
-      : buildLongReportPrompt(numPages)) + sourceEvidencePrompt(sourceEvidence);
+      : buildLongReportPrompt(numPages)) + sourceEvidencePrompt(sourceEvidence) +
+      (sourceChapters.length ? '\n[원문에서 확인한 대제목 구조] chapters는 아래 제목과 순서를 그대로 사용하세요. 중간 소제목을 별도 챕터로 승격하지 마세요.\n' + JSON.stringify(sourceChapters) : '');
     setTracePrompt(trace, prompt);
 
     // Gemini API 호출 (선택된 모델로만 3회 자동 재시도)
@@ -116,6 +119,11 @@ export async function POST(req: NextRequest) {
 
     const parsedData = parsed.data;
     trace.parsedOutput = JSON.parse(JSON.stringify(parsedData));
+    if (sourceChapters.length) {
+      parsedData.chapters = sourceChapters.map(chapter => chapter.title);
+      parsedData.chapterRanges = sourceChapters;
+      trace.transformations.push('PDF의 순차 로마숫자 대제목과 붙임 표제로 목차 및 물리적 분석 범위를 고정했습니다.');
+    }
     parsedData.sourceReview = validateSourceReview(parsedData.sourceReview, sourceEvidence);
     if (Array.isArray(parsedData.sections)) parsedData.sections = parsedData.sections.map((section: any) => ({
       ...section, sourceReview: validateSourceReview(section.sourceReview, sourceEvidence),

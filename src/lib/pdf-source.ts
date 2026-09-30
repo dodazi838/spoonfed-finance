@@ -11,7 +11,7 @@ export async function extractPdfSource(buffer: Buffer): Promise<SourceEvidence> 
         const content = await page.getTextContent({ normalizeWhitespace: true, disableCombineTextItems: false });
         let text = '', lastY: number | undefined;
         for (const item of content.items) {
-          text += lastY !== undefined && lastY !== item.transform[5] ? '\n' + item.str : item.str;
+          text += (lastY !== undefined && lastY !== item.transform[5] ? '\n' : text ? ' ' : '') + item.str;
           lastY = item.transform[5];
         }
         pages.push({ page: page.pageNumber, text });

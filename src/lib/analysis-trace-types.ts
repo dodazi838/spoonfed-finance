@@ -1,5 +1,5 @@
 export const TRACE_SCHEMA_VERSION = 1;
-export const PROMPT_VERSION = '2026-09-30.2';
+export const PROMPT_VERSION = '2026-09-30.3';
 
 export type ParseMethod = 'direct' | 'code-block' | 'brace-extraction' | 'partial-recovery' | 'failed';
 export interface ParseDiagnostics {
@@ -17,7 +17,7 @@ export interface AnalysisCallTrace {
   completedAt?: string;
   durationMs?: number;
   status: 'running' | 'success' | 'recovered' | 'error';
-  input: { numPages?: number; chapterTitle?: string; mode?: 'short' | 'long' };
+  input: { numPages?: number; chapterTitle?: string; chapterRange?: import('./source-chapters').SourceChapter; mode?: 'short' | 'long' };
   versions: { app: string; prompt: string; deployment: string };
   model: { requested: string; reported?: string; temperature: number; maxOutputTokens: number };
   prompt: { text: string; sha256: string };
