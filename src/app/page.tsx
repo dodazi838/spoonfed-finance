@@ -638,7 +638,7 @@ export default function Home() {
         <div className={styles.badge}>금융·경제 보고서 분석</div>
         <h1 className={styles.title}>
           금융·경제 보고서,<br />
-          <span>핵심부터 차근차근.</span>
+          <span>핵심 내용부터 그 배경까지.</span>
         </h1>
         <p className={styles.description}>
           한국은행·금융감독원 등의 PDF 보고서를 올려 주세요.<br />
