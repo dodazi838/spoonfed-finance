@@ -641,8 +641,8 @@ export default function Home() {
           <span>핵심 내용부터 그 배경까지.</span>
         </h1>
         <p className={styles.description}>
-          한국은행·금융감독원 등의 PDF 보고서를 올려 주세요.<br />
-          선택한 챕터의 주요 내용과 수치를 풀어 설명하고, 차트로 정리합니다.
+          PDF 보고서를 올리고 궁금한 챕터를 골라 주세요.<br />
+          주요 수치와 배경을 풀어 설명하고, 차트로 정리합니다.
         </p>
       </section>
 
