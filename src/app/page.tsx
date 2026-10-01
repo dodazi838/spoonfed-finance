@@ -330,7 +330,7 @@ export default function Home() {
       await saveAnalysisSession(session, user?.uid);
 
       // 3. AI 분석 요청 (/api/analyze)
-      setUploadProgressText('AI가 보고서 핵심 목차 및 내용을 심층 스캔 중입니다...');
+      setUploadProgressText('보고서의 목차와 주요 내용을 확인하고 있습니다...');
       const response = await fetch('/api/analyze', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'x-analysis-id': session.analysisId },
@@ -635,14 +635,14 @@ export default function Home() {
       {step !== 'analyze' && activeAnalysisId && <AnalysisTracePanel analysisId={activeAnalysisId} />}
       
       <section className={`${styles.hero} animate-fade-in`}>
-        <div className={styles.badge}>FINANCIAL REPORT INTELLIGENCE</div>
+        <div className={styles.badge}>금융·경제 보고서 분석</div>
         <h1 className={styles.title}>
-          전문 금융·경제 리포트를<br />
-          <span>가장 깊이 있고 명쾌하게.</span>
+          금융·경제 보고서,<br />
+          <span>핵심부터 차근차근.</span>
         </h1>
         <p className={styles.description}>
-          한국은행, 금융감독원 등 주요 기관의 PDF 보고서를 업로드하세요.<br />
-          원하는 챕터를 선별하여 상세한 본문 해설과 데이터 차트를 정리해 드립니다.
+          한국은행·금융감독원 등의 PDF 보고서를 올려 주세요.<br />
+          선택한 챕터의 주요 내용과 수치를 풀어 설명하고, 차트로 정리합니다.
         </p>
       </section>
 
@@ -652,7 +652,7 @@ export default function Home() {
           <div className={styles.modelBadgeContainer}>
             <div className={styles.modelBadge}>
               <strong className={styles.modelBadgeName}>Gemini 3.8 Flash</strong>
-              <span className={styles.modelBadgeDesc}>최신 AI 모델 적용 중</span>
+              <span className={styles.modelBadgeDesc}>분석에 사용하는 AI 모델</span>
             </div>
           </div>
 
@@ -674,8 +674,8 @@ export default function Home() {
             {isUploading ? (
               <div className={styles.centeredColumn}>
                 <Loader2 className={styles.uploadIcon} style={{ animation: 'spin 2s linear infinite' }} />
-                <h3 className={styles.uploadText}>{uploadProgressText || '리포트 분석 진행 중...'}</h3>
-                <p className={styles.uploadSubtext}>대용량 파일 청크 전송 및 AI 심층 스캔 중입니다</p>
+                <h3 className={styles.uploadText}>{uploadProgressText || '보고서를 읽고 있습니다...'}</h3>
+                <p className={styles.uploadSubtext}>파일을 업로드한 뒤 목차와 주요 내용을 확인합니다.</p>
               </div>
             ) : file ? (
               <div className={styles.centeredColumn}>
@@ -686,7 +686,7 @@ export default function Home() {
             ) : (
               <div className={styles.centeredColumn}>
                 <UploadCloud className={styles.uploadIcon} />
-                <h3 className={styles.uploadText}>분석할 PDF 리포트 업로드</h3>
+                <h3 className={styles.uploadText}>읽어볼 PDF 보고서를 올려 주세요</h3>
                 <p className={styles.uploadSubtext}>파일을 드래그하거나 클릭하여 선택하세요 (최대 100MB 지원)</p>
               </div>
             )}
@@ -704,30 +704,30 @@ export default function Home() {
       {step === 'select' && tocData && (
         <section className={`${styles.selectionSection} animate-fade-in`}>
           <div className={styles.selectionPanel}>
-            <h2 className={styles.selectionTitle}>보고서 요약 및 목차 선택</h2>
+            <h2 className={styles.selectionTitle}>어떤 챕터를 살펴볼까요?</h2>
             
             <div className={styles.summaryBox}>
-              <h3 className={styles.summaryTitle}>📝 핵심 요약</h3>
+              <h3 className={styles.summaryTitle}>주요 내용</h3>
               <ul className={styles.summaryList}>
                 {tocData.summary?.map((item: string, idx: number) => (
                   <li key={idx}>{item}</li>
                 ))}
               </ul>
-              <h3 className={styles.summaryTitle} style={{ marginTop: '1.5rem' }}>💡 시사점 및 전망</h3>
+              <h3 className={styles.summaryTitle} style={{ marginTop: '1.5rem' }}>앞으로 살펴볼 점</h3>
               <p className={styles.selectionImplications}>{tocData.implications}</p>
             </div>
 
             <div className={styles.chapterBox}>
               <div className={styles.chapterHeader}>
-                <h3 className={styles.chapterTitle}>📖 상세 분석할 챕터 선택</h3>
+                <h3 className={styles.chapterTitle}>자세히 읽을 챕터</h3>
                 <span className={`${styles.chapterBadge} ${selectedChapters.length === chapterLimit ? styles.chapterBadgeWarning : styles.chapterBadgeActive}`}>
                   {selectedChapters.length} {isShort ? '선택됨' : '/ 4 선택됨'}
                 </span>
               </div>
               <p className={styles.chapterDesc}>
                 {isShort
-                  ? "분량이 짧은 보고서이므로 제한 없이 모든 챕터를 선택하여 상세 분석할 수 있습니다." 
-                  : "가장 관심 있는 핵심 챕터를 최대 4개까지만 골라주세요. AI가 선택된 챕터에 한해 심층 분석과 차트를 추출합니다."}
+                  ? "짧은 보고서는 모든 챕터를 선택할 수 있습니다."
+                  : "궁금한 챕터를 최대 4개까지 골라 주세요. 선택한 부분의 내용과 수치를 자세히 정리합니다."}
               </p>
               
               {isShort && (

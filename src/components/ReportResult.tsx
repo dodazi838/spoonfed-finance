@@ -175,7 +175,7 @@ export function snapshotReportForTrace(data: ReportData) {
   const { fileUri: _fileUri, mimeType: _mimeType, ...result } = data;
   return { result, displayedMarkdown: {
     summary: data.summary?.map(item => sanitizeMarkdownText(item)),
-    implications: sanitizeMarkdownText(`💡 ${data.implications}`),
+    implications: sanitizeMarkdownText(data.implications),
     sections: data.sections?.map(section => ({
       title: section.title,
       easyExplanation: sanitizeMarkdownText(section.easyExplanation || ''),
@@ -253,9 +253,9 @@ export default function ReportResult({
     setIsCopying(true);
     try {
       const markdownText = `
-# 보고서 핵심 한눈에 보기
+# 보고서 분석
 
-## 보고서 핵심 요약
+## 주요 내용
 ${data.summary?.map(s => `- ${sanitizeMarkdownText(s)}`).join('\n')}
 
 ---
@@ -266,7 +266,7 @@ ${sanitizeMarkdownText(section.easyExplanation || '')}
 ---
 `).join('\n') || ''}
 
-## 핵심 시사점 및 전망
+## 앞으로 살펴볼 점
 ${sanitizeMarkdownText(data.implications)}
       `.trim();
 
@@ -421,7 +421,7 @@ ${sanitizeMarkdownText(section.easyExplanation || '')}
       <section className={styles.section}>
         <div className={styles.sectionHeader}>
           <CheckCircle2 className={styles.icon} size={28} />
-          <h2 className={styles.sectionTitle}>보고서 핵심 요약</h2>
+          <h2 className={styles.sectionTitle}>주요 내용</h2>
         </div>
         <ul className={styles.summaryList}>
           {data.summary?.map((item, index) => (
@@ -529,7 +529,7 @@ ${sanitizeMarkdownText(section.easyExplanation || '')}
       <section className={styles.section}>
         <div className={styles.sectionHeader}>
           <FileText className={styles.icon} size={28} />
-          <h2 className={styles.sectionTitle}>핵심 시사점 및 전망</h2>
+          <h2 className={styles.sectionTitle}>앞으로 살펴볼 점</h2>
         </div>
         <div className={styles.lifeImpactBox}>
           <div className={`${styles.lifeImpactText} markdown-content`}>
@@ -537,7 +537,7 @@ ${sanitizeMarkdownText(section.easyExplanation || '')}
               remarkPlugins={[remarkGfm]} 
               rehypePlugins={[rehypeRaw]}
             >
-              {sanitizeMarkdownText(`💡 ` + data.implications)}
+              {sanitizeMarkdownText(data.implications)}
             </ReactMarkdown>
           </div>
         </div>

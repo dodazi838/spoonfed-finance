@@ -13,8 +13,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "떠먹여주는 금융경제 | AI 경제 리포트 분석기",
-  description: "한국은행, 금융감독원 등 공공기관의 경제 리포트를 AI로 심층 분석합니다. 복잡한 금융·경제 보고서를 대학생도 이해할 수 있도록 쉽게 풀어드립니다.",
+  title: "떠먹여주는 금융경제 | 금융·경제 보고서 분석",
+  description: "한국은행·금융감독원 등의 PDF 보고서를 올리고 궁금한 챕터를 골라 보세요. 주요 내용과 수치를 풀어 설명하고, 차트로 정리합니다.",
 };
 
 import { AuthProvider } from "@/lib/auth-context";

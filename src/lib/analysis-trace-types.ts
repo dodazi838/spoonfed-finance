@@ -1,5 +1,5 @@
 export const TRACE_SCHEMA_VERSION = 1;
-export const PROMPT_VERSION = '2026-09-30.3';
+export const PROMPT_VERSION = '2026-10-01.1';
 
 export type ParseMethod = 'direct' | 'code-block' | 'brace-extraction' | 'partial-recovery' | 'failed';
 export interface ParseDiagnostics {
